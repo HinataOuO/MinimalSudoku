@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "MinimalSudoku",
+    "slug": "minimal-sudoku",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "minimalsudoku",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#f8fafc"
+      }
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
