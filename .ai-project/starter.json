@@ -1,0 +1,64 @@
+{
+  "version": "2.0.0",
+  "canonicalRoot": ".ai-project",
+  "skills": [
+    "backend",
+    "close-task",
+    "commands",
+    "domain-feature",
+    "frontend",
+    "git-issue",
+    "i18n",
+    "log-issue",
+    "migration",
+    "next-task",
+    "push",
+    "schema",
+    "session-status",
+    "task-status"
+  ],
+  "claudeCommands": [
+    "backend",
+    "close-task",
+    "commands",
+    "domain-feature",
+    "frontend",
+    "git-issue",
+    "i18n",
+    "log-issue",
+    "migration",
+    "next-task",
+    "push",
+    "schema",
+    "session-status",
+    "task-status"
+  ],
+  "requiredFiles": [
+    "starter.json",
+    "README.md",
+    "MIGRATION.md",
+    "CHECKS.md",
+    "core/KERNEL.md",
+    "core/LOAD_ORDER.md",
+    "core/CONVENTIONS.md",
+    "project/PROJECT_INDEX.md",
+    "project/memory/MEMORY_INDEX.md",
+    "project/roadmap/INDEX.md",
+    "adapters/codex/AGENTS.md",
+    "adapters/claude/CLAUDE.md"
+  ],
+  "memoryTags": [
+    "always",
+    "backend",
+    "frontend",
+    "migration",
+    "domain",
+    "roadmap"
+  ],
+  "roadmapLayers": [
+    "database",
+    "backend",
+    "frontend",
+    "verify"
+  ]
+}
