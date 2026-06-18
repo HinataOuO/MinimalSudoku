@@ -3,13 +3,13 @@ export const colors = {
   panel: "#ffffff",
   ink: "#111827",
   muted: "#64748b",
-  line: "#cbd5e1",
-  strongLine: "#334155",
+  line: "#e2e8f0",
+  strongLine: "#cbd5e1",
   accent: "#0f766e",
   accentSoft: "#ccfbf1",
   danger: "#dc2626",
   dangerSoft: "#fee2e2",
   fixedCell: "#f1f5f9",
   selectedCell: "#dbeafe",
-  relatedCell: "#eff6ff"
+  relatedCell: "#e0f2fe"
 } as const;

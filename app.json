@@ -16,7 +16,8 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#f8fafc"
-      }
+      },
+      "package": "com.anonymous.minimalsudoku"
     },
     "plugins": [
       "expo-router"

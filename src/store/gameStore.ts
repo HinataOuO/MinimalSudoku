@@ -15,18 +15,29 @@ import { cloneGrid } from "@/features/sudoku/validator";
 
 type MistakeMap = Record<string, boolean>;
 
+type MoveSnapshot = {
+  userGrid: SudokuGrid;
+  selectedCell: CellPosition | null;
+  status: GameStatus;
+  mistakes: MistakeMap;
+};
+
 type GameState = {
+  hasHydrated: boolean;
   puzzle: SudokuPuzzle | null;
   userGrid: SudokuGrid | null;
   selectedCell: CellPosition | null;
   difficulty: Difficulty;
   status: GameStatus;
   mistakes: MistakeMap;
+  moveHistory: MoveSnapshot[];
+  setHasHydrated: (hasHydrated: boolean) => void;
   startNewGame: (difficulty: Difficulty) => void;
   restartGame: () => void;
   selectCell: (cell: CellPosition) => void;
   setCellValue: (value: Exclude<CellValue, 0>) => void;
   clearSelectedCell: () => void;
+  undoLastMove: () => void;
 };
 
 function keyForCell(cell: CellPosition) {
@@ -42,12 +53,16 @@ function isPuzzleCompleted(grid: SudokuGrid, solution: SudokuGrid): boolean {
 export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
+      hasHydrated: false,
       puzzle: null,
       userGrid: null,
       selectedCell: null,
       difficulty: "easy",
       status: "idle",
       mistakes: {},
+      moveHistory: [],
+
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
 
       startNewGame: (difficulty) => {
         const puzzle = generatePuzzle(difficulty);
@@ -57,7 +72,8 @@ export const useGameStore = create<GameState>()(
           selectedCell: null,
           difficulty,
           status: "playing",
-          mistakes: {}
+          mistakes: {},
+          moveHistory: []
         });
       },
 
@@ -71,7 +87,8 @@ export const useGameStore = create<GameState>()(
           userGrid: cloneGrid(puzzle.givens),
           selectedCell: null,
           status: "playing",
-          mistakes: {}
+          mistakes: {},
+          moveHistory: []
         });
       },
 
@@ -94,6 +111,11 @@ export const useGameStore = create<GameState>()(
           return;
         }
 
+        const currentValue = userGrid[selectedCell.row][selectedCell.col];
+        if (currentValue === value) {
+          return;
+        }
+
         const nextGrid = cloneGrid(userGrid);
         nextGrid[selectedCell.row][selectedCell.col] = value;
 
@@ -110,7 +132,16 @@ export const useGameStore = create<GameState>()(
         set({
           userGrid: nextGrid,
           mistakes,
-          status: isPuzzleCompleted(nextGrid, puzzle.solution) ? "completed" : "playing"
+          status: isPuzzleCompleted(nextGrid, puzzle.solution) ? "completed" : "playing",
+          moveHistory: [
+            ...get().moveHistory,
+            {
+              userGrid: cloneGrid(userGrid),
+              selectedCell,
+              status: get().status,
+              mistakes: { ...get().mistakes }
+            }
+          ]
         });
       },
 
@@ -124,6 +155,10 @@ export const useGameStore = create<GameState>()(
           return;
         }
 
+        if (userGrid[selectedCell.row][selectedCell.col] === 0) {
+          return;
+        }
+
         const nextGrid = cloneGrid(userGrid);
         nextGrid[selectedCell.row][selectedCell.col] = 0;
 
@@ -133,20 +168,49 @@ export const useGameStore = create<GameState>()(
         set({
           userGrid: nextGrid,
           mistakes,
-          status: "playing"
+          status: "playing",
+          moveHistory: [
+            ...get().moveHistory,
+            {
+              userGrid: cloneGrid(userGrid),
+              selectedCell,
+              status: get().status,
+              mistakes: { ...get().mistakes }
+            }
+          ]
+        });
+      },
+
+      undoLastMove: () => {
+        const { moveHistory } = get();
+        const previous = moveHistory[moveHistory.length - 1];
+        if (!previous) {
+          return;
+        }
+
+        set({
+          userGrid: cloneGrid(previous.userGrid),
+          selectedCell: previous.selectedCell,
+          status: previous.status,
+          mistakes: { ...previous.mistakes },
+          moveHistory: moveHistory.slice(0, -1)
         });
       }
     }),
     {
       name: "minimal-sudoku-game",
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
       partialize: (state) => ({
         puzzle: state.puzzle,
         userGrid: state.userGrid,
         selectedCell: state.selectedCell,
         difficulty: state.difficulty,
         status: state.status,
-        mistakes: state.mistakes
+        mistakes: state.mistakes,
+        moveHistory: state.moveHistory
       })
     }
   )

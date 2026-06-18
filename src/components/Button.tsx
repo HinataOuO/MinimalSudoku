@@ -1,11 +1,10 @@
-import { Pressable, Text } from "react-native";
+import { forwardRef, type ElementRef } from "react";
+import { Pressable, Text, type PressableProps } from "react-native";
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
 
-type ButtonProps = {
+type ButtonProps = PressableProps & {
   label: string;
-  onPress: () => void;
-  disabled?: boolean;
   variant?: ButtonVariant;
 };
 
@@ -21,22 +20,29 @@ const textClass: Record<ButtonVariant, string> = {
   ghost: "text-ink"
 };
 
-export function Button({
-  label,
-  onPress,
-  disabled = false,
-  variant = "primary"
-}: ButtonProps) {
+export const Button = forwardRef<ElementRef<typeof Pressable>, ButtonProps>(function Button(
+  {
+    label,
+    disabled = false,
+    variant = "primary",
+    className = "",
+    hitSlop = 8,
+    ...pressableProps
+  },
+  ref
+) {
   return (
     <Pressable
+      ref={ref}
+      {...pressableProps}
       accessibilityRole="button"
       disabled={disabled}
-      onPress={onPress}
+      hitSlop={hitSlop}
       className={`items-center justify-center rounded-lg border px-4 py-3 ${
         buttonClass[variant]
-      } ${disabled ? "opacity-40" : "active:opacity-80"}`}
+      } ${disabled ? "opacity-40" : "active:opacity-80"} ${className}`}
     >
       <Text className={`text-base font-semibold ${textClass[variant]}`}>{label}</Text>
     </Pressable>
   );
-}
+});

@@ -4,6 +4,8 @@ import { CellPosition } from "@/features/sudoku/types";
 import { useGameStore } from "@/store/gameStore";
 import { colors } from "@/theme/colors";
 
+const lineWidth = 1;
+
 function isRelated(a: CellPosition, b: CellPosition) {
   return (
     a.row === b.row ||
@@ -14,7 +16,7 @@ function isRelated(a: CellPosition, b: CellPosition) {
 }
 
 export function SudokuGrid() {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const puzzle = useGameStore((state) => state.puzzle);
   const userGrid = useGameStore((state) => state.userGrid);
   const selectedCell = useGameStore((state) => state.selectedCell);
@@ -25,21 +27,25 @@ export function SudokuGrid() {
     return null;
   }
 
-  const size = Math.min(width - 32, 420);
-  const cellSize = size / 9;
+  const size = Math.min(width - 12, height * 0.56, 460);
+  const cellSize = (size - lineWidth * 2 - lineWidth * 8) / 9;
+  const boxLinePositions = [3, 6].map(
+    (boundary) => lineWidth + boundary * cellSize + (boundary - 1) * lineWidth
+  );
 
   return (
     <View
-      className="self-center overflow-hidden rounded-lg bg-panel"
+      className="self-center overflow-hidden rounded-md"
       style={{
         width: size,
         height: size,
-        borderWidth: 2,
-        borderColor: colors.strongLine
+        padding: lineWidth,
+        gap: lineWidth,
+        backgroundColor: colors.line
       }}
     >
       {userGrid.map((row, rowIndex) => (
-        <View key={rowIndex} className="flex-row">
+        <View key={rowIndex} className="flex-row" style={{ gap: lineWidth }}>
           {row.map((value, colIndex) => {
             const position = { row: rowIndex, col: colIndex };
             const isSelected =
@@ -65,23 +71,14 @@ export function SudokuGrid() {
                         ? colors.fixedCell
                         : related
                           ? colors.relatedCell
-                          : colors.panel,
-                  borderRightWidth: colIndex === 2 || colIndex === 5 ? 2 : 1,
-                  borderBottomWidth: rowIndex === 2 || rowIndex === 5 ? 2 : 1,
-                  borderColor:
-                    colIndex === 2 ||
-                    colIndex === 5 ||
-                    rowIndex === 2 ||
-                    rowIndex === 5
-                      ? colors.strongLine
-                      : colors.line
+                          : colors.panel
                 }}
               >
                 <Text
-                  className={`font-bold ${fixed ? "text-ink" : "text-accent"} ${
+                  className={`font-semibold ${fixed ? "text-ink" : "text-accent"} ${
                     mistake ? "text-danger" : ""
                   }`}
-                  style={{ fontSize: Math.max(16, cellSize * 0.44) }}
+                  style={{ fontSize: Math.max(18, cellSize * 0.56) }}
                 >
                   {value === 0 ? "" : value}
                 </Text>
@@ -89,6 +86,34 @@ export function SudokuGrid() {
             );
           })}
         </View>
+      ))}
+      {boxLinePositions.map((position) => (
+        <View
+          key={`vertical-${position}`}
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: position,
+            top: 0,
+            bottom: 0,
+            width: lineWidth,
+            backgroundColor: colors.strongLine
+          }}
+        />
+      ))}
+      {boxLinePositions.map((position) => (
+        <View
+          key={`horizontal-${position}`}
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: position,
+            height: lineWidth,
+            backgroundColor: colors.strongLine
+          }}
+        />
       ))}
     </View>
   );

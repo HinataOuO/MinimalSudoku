@@ -7,38 +7,46 @@ const numbers: FilledCellValue[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 export function NumberPad() {
   const setCellValue = useGameStore((state) => state.setCellValue);
-  const clearSelectedCell = useGameStore((state) => state.clearSelectedCell);
+  const undoLastMove = useGameStore((state) => state.undoLastMove);
+  const canUndo = useGameStore((state) => state.moveHistory.length > 0);
   const selectedCell = useGameStore((state) => state.selectedCell);
   const disabled = selectedCell === null;
 
   return (
-    <View className="gap-3">
-      <View className="flex-row justify-between gap-2">
+    <View className="gap-4">
+      <View className="flex-row justify-start">
+        <Pressable
+          accessibilityLabel="Undo last move"
+          accessibilityRole="button"
+          disabled={!canUndo}
+          hitSlop={8}
+          onPress={undoLastMove}
+          className={`items-center justify-center gap-1 rounded-lg px-4 py-2 ${
+            canUndo ? "active:bg-accentSoft" : "opacity-40"
+          }`}
+        >
+          <Text className="text-3xl leading-8 text-muted">↶</Text>
+          <Text className="text-xs font-semibold text-muted">Undo</Text>
+        </Pressable>
+      </View>
+
+      <View className="flex-row gap-1.5">
         {numbers.map((number) => (
           <Pressable
             key={number}
+            accessibilityLabel={`Enter ${number}`}
             accessibilityRole="button"
             disabled={disabled}
+            hitSlop={4}
             onPress={() => setCellValue(number)}
-            className={`h-11 flex-1 items-center justify-center rounded-lg border border-line bg-panel ${
+            className={`h-16 flex-1 items-center justify-center rounded-lg border border-line bg-panel ${
               disabled ? "opacity-40" : "active:bg-accentSoft"
             }`}
           >
-            <Text className="text-lg font-bold text-ink">{number}</Text>
+            <Text className="text-3xl font-semibold text-accent">{number}</Text>
           </Pressable>
         ))}
       </View>
-
-      <Pressable
-        accessibilityRole="button"
-        disabled={disabled}
-        onPress={clearSelectedCell}
-        className={`items-center rounded-lg border border-line bg-panel py-3 ${
-          disabled ? "opacity-40" : "active:bg-dangerSoft"
-        }`}
-      >
-        <Text className="font-semibold text-ink">Clear</Text>
-      </Pressable>
     </View>
   );
 }
