@@ -10,7 +10,9 @@ export function NumberPad() {
   const undoLastMove = useGameStore((state) => state.undoLastMove);
   const canUndo = useGameStore((state) => state.moveHistory.length > 0);
   const selectedCell = useGameStore((state) => state.selectedCell);
-  const disabled = selectedCell === null;
+  const puzzle = useGameStore((state) => state.puzzle);
+  const disabled =
+    selectedCell === null || puzzle?.givens[selectedCell.row][selectedCell.col] !== 0;
 
   return (
     <View className="gap-4">

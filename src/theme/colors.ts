@@ -10,6 +10,7 @@ export const colors = {
   danger: "#dc2626",
   dangerSoft: "#fee2e2",
   fixedCell: "#f1f5f9",
-  selectedCell: "#dbeafe",
-  relatedCell: "#e0f2fe"
+  selectedCell: "#d7ffcd",
+  relatedCell: "#d7ffcd",
+  matchingValueCell: "#a0ff8a"
 } as const;

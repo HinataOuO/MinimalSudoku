@@ -52,6 +52,10 @@ export function SudokuGrid() {
               selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
             const fixed = puzzle.givens[rowIndex][colIndex] !== 0;
             const related = selectedCell ? isRelated(position, selectedCell) : false;
+            const selectedValue = selectedCell
+              ? userGrid[selectedCell.row][selectedCell.col]
+              : 0;
+            const matchesSelectedValue = selectedValue !== 0 && value === selectedValue;
             const mistake = mistakes[`${rowIndex}-${colIndex}`] === true;
 
             return (
@@ -65,12 +69,12 @@ export function SudokuGrid() {
                   height: cellSize,
                   backgroundColor: mistake
                     ? colors.dangerSoft
-                    : isSelected
-                      ? colors.selectedCell
-                      : fixed
-                        ? colors.fixedCell
-                        : related
-                          ? colors.relatedCell
+                    : isSelected || matchesSelectedValue
+                      ? colors.matchingValueCell
+                      : related
+                        ? colors.relatedCell
+                        : fixed
+                          ? colors.fixedCell
                           : colors.panel
                 }}
               >

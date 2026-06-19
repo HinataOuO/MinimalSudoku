@@ -94,7 +94,7 @@ export const useGameStore = create<GameState>()(
 
       selectCell: (cell) => {
         const { puzzle } = get();
-        if (!puzzle || puzzle.givens[cell.row][cell.col] !== 0) {
+        if (!puzzle) {
           return;
         }
 

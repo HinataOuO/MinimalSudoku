@@ -17,6 +17,18 @@ function findEditableCell(grid: SudokuGrid): CellPosition {
   throw new Error("Expected generated puzzle to have an editable cell");
 }
 
+function findFixedCell(grid: SudokuGrid): CellPosition {
+  for (let row = 0; row < grid.length; row += 1) {
+    for (let col = 0; col < grid[row].length; col += 1) {
+      if (grid[row][col] !== 0) {
+        return { row, col };
+      }
+    }
+  }
+
+  throw new Error("Expected generated puzzle to have a fixed cell");
+}
+
 function findTwoEditableCells(grid: SudokuGrid): [CellPosition, CellPosition] {
   const cells: CellPosition[] = [];
 
@@ -107,5 +119,33 @@ describe("game store undo", () => {
 
     expect(useGameStore.getState().moveHistory).toHaveLength(0);
     expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(0);
+  });
+});
+
+describe("game store selection", () => {
+  beforeEach(() => {
+    useGameStore.getState().startNewGame("easy");
+  });
+
+  it("selects fixed cells", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findFixedCell(puzzle!.givens);
+
+    useGameStore.getState().selectCell(cell);
+
+    expect(useGameStore.getState().selectedCell).toEqual(cell);
+  });
+
+  it("does not change fixed cells when entering a value", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findFixedCell(puzzle!.givens);
+    const originalValue = valueAt(puzzle!.givens, cell);
+    const nextValue = (originalValue === 1 ? 2 : 1) as FilledCellValue;
+
+    useGameStore.getState().selectCell(cell);
+    useGameStore.getState().setCellValue(nextValue);
+
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(originalValue);
+    expect(useGameStore.getState().moveHistory).toHaveLength(0);
   });
 });
