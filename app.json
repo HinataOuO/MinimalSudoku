@@ -2,8 +2,9 @@
   "expo": {
     "name": "MinimalSudoku",
     "slug": "minimal-sudoku",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/img/icon.png",
     "scheme": "minimalsudoku",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
@@ -15,7 +16,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#f8fafc"
+        "foregroundImage": "./assets/img/icon.png",
+        "backgroundColor": "#ffcc19"
       },
       "package": "com.anonymous.minimalsudoku"
     },

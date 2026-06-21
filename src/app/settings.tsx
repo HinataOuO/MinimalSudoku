@@ -76,7 +76,7 @@ export default function SettingsScreen() {
 }
 
 function AudioSettings() {
-  const { muted, setVolume, volume } = useSound();
+  const { muted, playUiClick, setVolume, volume } = useSound();
 
   return (
     <View className="gap-4 rounded-md border border-line bg-panel p-5">
@@ -96,6 +96,9 @@ function AudioSettings() {
               hitSlop={6}
               onPress={() => {
                 setVolume(preset.volume);
+                if (!preset.muted) {
+                  playUiClick();
+                }
               }}
               className={`flex-1 items-center justify-center active:opacity-75 ${
                 preset.label === "Mute" ? "" : "border-l border-line"
