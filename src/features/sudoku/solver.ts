@@ -1,27 +1,120 @@
-import { cloneGrid, canPlaceValue, isValidGridShape } from "./validator";
-import { CellValue, EMPTY_CELL, GRID_SIZE, SudokuGrid } from "./types";
+import { cloneGrid, isValidGridShape } from "./validator";
+import { EMPTY_CELL, FilledCellValue, GRID_SIZE, SudokuGrid } from "./types";
 
-function findEmptyCell(grid: SudokuGrid): [number, number] | null {
+type EmptyCell = {
+  row: number;
+  col: number;
+  candidates: number;
+};
+
+const ALL_VALUES_MASK = 0b1111111110;
+
+function boxIndex(row: number, col: number): number {
+  return Math.floor(row / 3) * 3 + Math.floor(col / 3);
+}
+
+function valueBit(value: number): number {
+  return 1 << value;
+}
+
+function maskSize(mask: number): number {
+  let size = 0;
+  let remaining = mask;
+
+  while (remaining) {
+    remaining &= remaining - 1;
+    size += 1;
+  }
+
+  return size;
+}
+
+function valuesFromMask(mask: number, randomize: boolean): FilledCellValue[] {
+  const values: FilledCellValue[] = [];
+
+  for (let value = 1; value <= 9; value += 1) {
+    if (mask & valueBit(value)) {
+      values.push(value as FilledCellValue);
+    }
+  }
+
+  return randomize ? shuffleValues(values) : values;
+}
+
+function buildMasks(grid: SudokuGrid): {
+  rowMasks: number[];
+  colMasks: number[];
+  boxMasks: number[];
+} | null {
+  const rowMasks = Array.from({ length: GRID_SIZE }, () => 0);
+  const colMasks = Array.from({ length: GRID_SIZE }, () => 0);
+  const boxMasks = Array.from({ length: GRID_SIZE }, () => 0);
+
   for (let row = 0; row < GRID_SIZE; row += 1) {
     for (let col = 0; col < GRID_SIZE; col += 1) {
-      if (grid[row][col] === EMPTY_CELL) {
-        return [row, col];
+      const value = grid[row][col];
+
+      if (value === EMPTY_CELL) {
+        continue;
+      }
+
+      const bit = valueBit(value);
+      const box = boxIndex(row, col);
+
+      if ((rowMasks[row] & bit) || (colMasks[col] & bit) || (boxMasks[box] & bit)) {
+        return null;
+      }
+
+      rowMasks[row] |= bit;
+      colMasks[col] |= bit;
+      boxMasks[box] |= bit;
+    }
+  }
+
+  return { rowMasks, colMasks, boxMasks };
+}
+
+function findBestEmptyCell(
+  grid: SudokuGrid,
+  rowMasks: number[],
+  colMasks: number[],
+  boxMasks: number[]
+): EmptyCell | null {
+  let best: EmptyCell | null = null;
+  let bestSize = GRID_SIZE + 1;
+
+  for (let row = 0; row < GRID_SIZE; row += 1) {
+    for (let col = 0; col < GRID_SIZE; col += 1) {
+      if (grid[row][col] !== EMPTY_CELL) {
+        continue;
+      }
+
+      const candidates = ALL_VALUES_MASK & ~(rowMasks[row] | colMasks[col] | boxMasks[boxIndex(row, col)]);
+      const candidateCount = maskSize(candidates);
+
+      if (!best || candidateCount < bestSize) {
+        best = { row, col, candidates };
+        bestSize = candidateCount;
+      }
+
+      if (candidateCount <= 1) {
+        return best;
       }
     }
   }
 
-  return null;
+  return best;
 }
 
-function shuffledNumbers(): CellValue[] {
-  const values: CellValue[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+function shuffleValues<T>(values: T[]): T[] {
+  const shuffled = [...values];
 
-  for (let index = values.length - 1; index > 0; index -= 1) {
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(Math.random() * (index + 1));
-    [values[index], values[swapIndex]] = [values[swapIndex], values[index]];
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
   }
 
-  return values;
+  return shuffled;
 }
 
 export function solveSudoku(grid: SudokuGrid, randomize = false): SudokuGrid | null {
@@ -30,28 +123,40 @@ export function solveSudoku(grid: SudokuGrid, randomize = false): SudokuGrid | n
   }
 
   const working = cloneGrid(grid);
+  const masks = buildMasks(working);
+
+  if (!masks) {
+    return null;
+  }
+
+  const { rowMasks, colMasks, boxMasks } = masks;
 
   function backtrack(): boolean {
-    const empty = findEmptyCell(working);
+    const empty = findBestEmptyCell(working, rowMasks, colMasks, boxMasks);
     if (!empty) {
       return true;
     }
 
-    const [row, col] = empty;
-    const candidates: CellValue[] = randomize
-      ? shuffledNumbers()
-      : [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    const { row, col } = empty;
+    const box = boxIndex(row, col);
+    const candidates = valuesFromMask(empty.candidates, randomize);
 
     for (const value of candidates) {
-      if (canPlaceValue(working, row, col, value)) {
-        working[row][col] = value;
+      const bit = valueBit(value);
 
-        if (backtrack()) {
-          return true;
-        }
+      working[row][col] = value;
+      rowMasks[row] |= bit;
+      colMasks[col] |= bit;
+      boxMasks[box] |= bit;
 
-        working[row][col] = EMPTY_CELL;
+      if (backtrack()) {
+        return true;
       }
+
+      working[row][col] = EMPTY_CELL;
+      rowMasks[row] &= ~bit;
+      colMasks[col] &= ~bit;
+      boxMasks[box] &= ~bit;
     }
 
     return false;
@@ -66,6 +171,13 @@ export function countSolutions(grid: SudokuGrid, limit = 2): number {
   }
 
   const working = cloneGrid(grid);
+  const masks = buildMasks(working);
+
+  if (!masks) {
+    return 0;
+  }
+
+  const { rowMasks, colMasks, boxMasks } = masks;
   let count = 0;
 
   function backtrack(): void {
@@ -73,21 +185,30 @@ export function countSolutions(grid: SudokuGrid, limit = 2): number {
       return;
     }
 
-    const empty = findEmptyCell(working);
+    const empty = findBestEmptyCell(working, rowMasks, colMasks, boxMasks);
     if (!empty) {
       count += 1;
       return;
     }
 
-    const [row, col] = empty;
+    const { row, col } = empty;
+    const box = boxIndex(row, col);
 
     for (let value = 1; value <= 9; value += 1) {
-      const cellValue = value as CellValue;
-      if (canPlaceValue(working, row, col, cellValue)) {
-        working[row][col] = cellValue;
-        backtrack();
-        working[row][col] = EMPTY_CELL;
+      if (!(empty.candidates & valueBit(value))) {
+        continue;
       }
+
+      const bit = valueBit(value);
+      working[row][col] = value as FilledCellValue;
+      rowMasks[row] |= bit;
+      colMasks[col] |= bit;
+      boxMasks[box] |= bit;
+      backtrack();
+      working[row][col] = EMPTY_CELL;
+      rowMasks[row] &= ~bit;
+      colMasks[col] &= ~bit;
+      boxMasks[box] &= ~bit;
     }
   }
 

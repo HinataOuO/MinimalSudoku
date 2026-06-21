@@ -3,12 +3,13 @@ import "@/theme/global.css";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 
+import { SoundProvider } from "@/audio/SoundProvider";
 import { colors } from "@/theme/colors";
 
 export default function RootLayout() {
   return (
-    <>
-      <StatusBar style="dark" />
+    <SoundProvider>
+      <StatusBar style="light" />
       <Stack
         screenOptions={{
           contentStyle: { backgroundColor: colors.canvas },
@@ -17,6 +18,6 @@ export default function RootLayout() {
           headerTitleStyle: { color: colors.ink, fontWeight: "700" }
         }}
       />
-    </>
+    </SoundProvider>
   );
 }

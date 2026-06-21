@@ -20,7 +20,9 @@
       "package": "com.anonymous.minimalsudoku"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-asset",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

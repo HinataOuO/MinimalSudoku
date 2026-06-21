@@ -5,15 +5,18 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        ink: "#111827",
-        muted: "#64748b",
-        line: "#cbd5e1",
-        panel: "#ffffff",
-        canvas: "#f8fafc",
-        accent: "#0f766e",
-        accentSoft: "#ccfbf1",
-        dangerSoft: "#fee2e2",
-        danger: "#dc2626"
+        ink: "#F2F2F2",
+        muted: "#8A8A8A",
+        line: "#222222",
+        strongLine: "#333333",
+        panel: "#111111",
+        panelElevated: "#151515",
+        canvas: "#0A0A0A",
+        accent: "#FFB547",
+        accentInk: "#14100A",
+        accentSoft: "#261D0F",
+        dangerSoft: "#241313",
+        danger: "#D66A6A"
       }
     }
   },

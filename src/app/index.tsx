@@ -1,43 +1,77 @@
-import { Link } from "expo-router";
-import { Text, View } from "react-native";
+import { Link, router, Stack, type Href } from "expo-router";
+import { Grid3X3, Play, Settings } from "lucide-react-native";
+import { Pressable, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useSound } from "@/audio/SoundProvider";
 import { Button } from "@/components/Button";
-import { Card } from "@/components/Card";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { useGameStore } from "@/store/gameStore";
+import { colors } from "@/theme/colors";
 
 export default function HomeScreen() {
   const hasHydrated = useGameStore((state) => state.hasHydrated);
-  const hasGame = useGameStore((state) => state.puzzle !== null);
+  const hasGame = useGameStore((state) => state.puzzle !== null && state.status === "playing");
+  const { playUiClick } = useSound();
 
   if (!hasHydrated) {
     return (
-      <View className="flex-1 justify-center px-6">
-        <Text className="text-center text-base font-semibold text-muted">Loading game...</Text>
-      </View>
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <LoadingScreen safeArea />
+      </>
     );
   }
 
   return (
-    <View className="flex-1 justify-center gap-6 px-6">
-      <View className="gap-2">
-        <Text className="text-4xl font-bold text-ink">Minimal Sudoku</Text>
-        <Text className="text-base leading-6 text-muted">
-          Clean offline Sudoku. Pick difficulty, solve grid, resume anytime.
-        </Text>
-      </View>
+    <SafeAreaView className="flex-1 bg-canvas px-7">
+      <Stack.Screen options={{ headerShown: false }} />
 
-      <Card>
-        <View className="gap-3">
+      <Pressable
+        accessibilityLabel="Open settings"
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={() => {
+          playUiClick();
+          router.push("/settings" as Href);
+        }}
+        className="absolute left-7 top-[88px] z-10 h-10 w-10 items-center justify-center rounded-md border border-line bg-transparent active:opacity-75"
+      >
+        <Settings color={colors.muted} size={20} strokeWidth={1.8} absoluteStrokeWidth />
+      </Pressable>
+
+      <View className="flex-1 justify-center gap-10">
+        <View className="items-center gap-4">
+          <Text className="text-center text-5xl font-medium tracking-wide text-ink">
+            Minimal Sudoku
+          </Text>
+          <Text className="max-w-sm text-center text-lg leading-7 text-muted">
+            Clean offline puzzles. Choose a difficulty, solve the grid, come back anytime.
+          </Text>
+        </View>
+
+        <View className="gap-4">
           <Link href="/difficulty" asChild>
-            <Button label="Play" />
+            <Button
+              icon={
+                <Grid3X3 color={colors.accentInk} size={20} strokeWidth={1.9} absoluteStrokeWidth />
+              }
+              label="New Game"
+            />
           </Link>
           {hasGame ? (
             <Link href="/game" asChild>
-              <Button label="Resume" variant="secondary" />
+              <Button
+                icon={
+                  <Play color={colors.ink} size={20} strokeWidth={1.9} absoluteStrokeWidth />
+                }
+                label="Continue"
+                variant="secondary"
+              />
             </Link>
           ) : null}
         </View>
-      </Card>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }

@@ -14,10 +14,34 @@ export type CellPosition = {
   col: number;
 };
 
+export type Technique =
+  | "nakedSingle"
+  | "hiddenSingle"
+  | "lockedCandidates"
+  | "nakedPair"
+  | "hiddenPair";
+
+export type RatingStep = {
+  technique: Technique;
+  row: number;
+  col: number;
+  value?: FilledCellValue;
+  unit?: "row" | "col" | "box";
+  eliminated?: number;
+};
+
+export type PuzzleRating = {
+  solved: boolean;
+  score: number;
+  maxTechnique: Technique | null;
+  steps: RatingStep[];
+};
+
 export type SudokuPuzzle = {
   givens: SudokuGrid;
   solution: SudokuGrid;
   difficulty: Difficulty;
+  rating?: PuzzleRating;
 };
 
-export type GameStatus = "idle" | "playing" | "completed";
+export type GameStatus = "idle" | "playing" | "completed" | "lost";

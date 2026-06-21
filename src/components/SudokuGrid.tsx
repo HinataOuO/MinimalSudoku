@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 
 import { CellPosition } from "@/features/sudoku/types";
@@ -5,6 +6,13 @@ import { useGameStore } from "@/store/gameStore";
 import { colors } from "@/theme/colors";
 
 const lineWidth = 1;
+const highlightBleed = lineWidth;
+const highlightBorderWidth = 2;
+const noteRows = [
+  [1, 2, 3],
+  [4, 5, 6],
+  [7, 8, 9]
+] as const;
 
 function isRelated(a: CellPosition, b: CellPosition) {
   return (
@@ -19,7 +27,9 @@ export function SudokuGrid() {
   const { width, height } = useWindowDimensions();
   const puzzle = useGameStore((state) => state.puzzle);
   const userGrid = useGameStore((state) => state.userGrid);
+  const noteGrid = useGameStore((state) => state.noteGrid);
   const selectedCell = useGameStore((state) => state.selectedCell);
+  const highlightedNumber = useGameStore((state) => state.highlightedNumber);
   const mistakes = useGameStore((state) => state.mistakes);
   const selectCell = useGameStore((state) => state.selectCell);
 
@@ -27,36 +37,50 @@ export function SudokuGrid() {
     return null;
   }
 
-  const size = Math.min(width - 12, height * 0.56, 460);
+  const size = Math.min(width - 24, height * 0.56, 460);
   const cellSize = (size - lineWidth * 2 - lineWidth * 8) / 9;
   const boxLinePositions = [3, 6].map(
     (boundary) => lineWidth + boundary * cellSize + (boundary - 1) * lineWidth
   );
+  const selectedValue = selectedCell ? userGrid[selectedCell.row][selectedCell.col] : 0;
+
+  function isProminentCell(row: number, col: number, value: number) {
+    const isSelected = selectedCell?.row === row && selectedCell?.col === col;
+    const matchesLongPressValue = highlightedNumber !== null && value === highlightedNumber;
+    const matchesSelectedValue =
+      highlightedNumber === null && selectedValue !== 0 && value === selectedValue;
+
+    return isSelected || matchesLongPressValue || matchesSelectedValue;
+  }
 
   return (
     <View
-      className="self-center overflow-hidden rounded-md"
+      className="self-center overflow-hidden rounded-sm"
       style={{
         width: size,
         height: size,
         padding: lineWidth,
         gap: lineWidth,
-        backgroundColor: colors.line
+        backgroundColor: colors.line,
+        shadowColor: colors.accent,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.04,
+        shadowRadius: 24,
+        elevation: 1
       }}
     >
       {userGrid.map((row, rowIndex) => (
         <View key={rowIndex} className="flex-row" style={{ gap: lineWidth }}>
           {row.map((value, colIndex) => {
             const position = { row: rowIndex, col: colIndex };
-            const isSelected =
-              selectedCell?.row === rowIndex && selectedCell?.col === colIndex;
             const fixed = puzzle.givens[rowIndex][colIndex] !== 0;
             const related = selectedCell ? isRelated(position, selectedCell) : false;
-            const selectedValue = selectedCell
-              ? userGrid[selectedCell.row][selectedCell.col]
-              : 0;
-            const matchesSelectedValue = selectedValue !== 0 && value === selectedValue;
+            const isProminentMatch = isProminentCell(rowIndex, colIndex, value);
             const mistake = mistakes[`${rowIndex}-${colIndex}`] === true;
+            const notes = noteGrid[rowIndex][colIndex];
+            const noteGridSize = cellSize - 4;
+            const noteCellSize = noteGridSize / 3;
+            const noteFontSize = Math.max(8, cellSize * 0.2);
 
             return (
               <Pressable
@@ -69,23 +93,54 @@ export function SudokuGrid() {
                   height: cellSize,
                   backgroundColor: mistake
                     ? colors.dangerSoft
-                    : isSelected || matchesSelectedValue
-                      ? colors.matchingValueCell
+                    : isProminentMatch
+                      ? colors.selectedCell
                       : related
                         ? colors.relatedCell
                         : fixed
                           ? colors.fixedCell
-                          : colors.panel
+                          : colors.emptyCell
                 }}
               >
-                <Text
-                  className={`font-semibold ${fixed ? "text-ink" : "text-accent"} ${
-                    mistake ? "text-danger" : ""
-                  }`}
-                  style={{ fontSize: Math.max(18, cellSize * 0.56) }}
-                >
-                  {value === 0 ? "" : value}
-                </Text>
+                {value === 0 && notes.length > 0 ? (
+                  <View style={{ width: noteGridSize, height: noteGridSize }}>
+                    {noteRows.map((noteRow) => (
+                      <View key={noteRow.join("-")} className="flex-row">
+                        {noteRow.map((note) => (
+                          <View
+                            key={note}
+                            className="items-center justify-center"
+                            style={{ width: noteCellSize, height: noteCellSize }}
+                          >
+                            <Text
+                              className="font-medium text-muted"
+                              style={{
+                                fontSize: noteFontSize,
+                                lineHeight: noteCellSize,
+                                textAlign: "center"
+                              }}
+                            >
+                              {notes.includes(note) ? note : ""}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text
+                    className={`font-medium ${fixed ? "text-ink" : "text-accent"} ${
+                      mistake ? "text-danger" : ""
+                    }`}
+                    style={{
+                      fontSize: Math.max(20, cellSize * 0.58),
+                      letterSpacing: 0.2,
+                      lineHeight: Math.max(22, cellSize * 0.64)
+                    }}
+                  >
+                    {value === 0 ? "" : value}
+                  </Text>
+                )}
               </Pressable>
             );
           })}
@@ -119,6 +174,78 @@ export function SudokuGrid() {
           }}
         />
       ))}
+      {userGrid.map((row, rowIndex) =>
+        row.map((value, colIndex) => {
+          if (!isProminentCell(rowIndex, colIndex, value)) {
+            return null;
+          }
+
+          const left = lineWidth + colIndex * (cellSize + lineWidth) - highlightBleed;
+          const top = lineWidth + rowIndex * (cellSize + lineWidth) - highlightBleed;
+          const highlightSize = cellSize + highlightBleed * 2;
+          const highlightOffset = highlightSize - highlightBorderWidth;
+          const highlightShadow = {
+            shadowColor: colors.accent,
+            shadowOffset: { width: 0, height: 0 },
+            shadowOpacity: 0.32,
+            shadowRadius: 9,
+            elevation: 3
+          };
+
+          return (
+            <Fragment key={`highlight-${rowIndex}-${colIndex}`}>
+              <View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  left,
+                  top,
+                  width: highlightSize,
+                  height: highlightBorderWidth,
+                  backgroundColor: colors.accent,
+                  ...highlightShadow
+                }}
+              />
+              <View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  left,
+                  top: top + highlightOffset,
+                  width: highlightSize,
+                  height: highlightBorderWidth,
+                  backgroundColor: colors.accent,
+                  ...highlightShadow
+                }}
+              />
+              <View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  left,
+                  top,
+                  width: highlightBorderWidth,
+                  height: highlightSize,
+                  backgroundColor: colors.accent,
+                  ...highlightShadow
+                }}
+              />
+              <View
+                pointerEvents="none"
+                style={{
+                  position: "absolute",
+                  left: left + highlightOffset,
+                  top,
+                  width: highlightBorderWidth,
+                  height: highlightSize,
+                  backgroundColor: colors.accent,
+                  ...highlightShadow
+                }}
+              />
+            </Fragment>
+          );
+        })
+      )}
     </View>
   );
 }
