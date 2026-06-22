@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { router, Stack } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { router, Stack, useFocusEffect } from "expo-router";
 import { Clock3, Home, RotateCcw } from "lucide-react-native";
-import { Pressable, Text, View } from "react-native";
+import { AppState, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Button } from "@/components/Button";
@@ -14,15 +14,13 @@ import { colors } from "@/theme/colors";
 import { formatElapsedTime } from "@/utils/format";
 
 function elapsedSeconds(
+  elapsedMs: number,
   startedAt: number | null,
-  finishedAt: number | null,
   currentTime: number
 ): number {
-  if (!startedAt) {
-    return 0;
-  }
+  const activeElapsedMs = startedAt === null ? 0 : Math.max(0, currentTime - startedAt);
 
-  return Math.floor(((finishedAt ?? currentTime) - startedAt) / 1000);
+  return Math.floor((elapsedMs + activeElapsedMs) / 1000);
 }
 
 export default function GameScreen() {
@@ -34,14 +32,48 @@ export default function GameScreen() {
   const isGenerating = useGameStore((state) => state.isGenerating);
   const generationError = useGameStore((state) => state.generationError);
   const startedAt = useGameStore((state) => state.startedAt);
-  const finishedAt = useGameStore((state) => state.finishedAt);
+  const elapsedMs = useGameStore((state) => state.elapsedMs);
   const restartGame = useGameStore((state) => state.restartGame);
+  const pauseTimer = useGameStore((state) => state.pauseTimer);
+  const resumeTimer = useGameStore((state) => state.resumeTimer);
   const { playGameOver, playUiClick } = useSound();
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const previousStatusRef = useRef(status);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (hasHydrated) {
+        resumeTimer();
+      }
+
+      return () => {
+        pauseTimer();
+      };
+    }, [hasHydrated, pauseTimer, resumeTimer])
+  );
+
   useEffect(() => {
-    if (status !== "playing") {
+    if (!hasHydrated) {
+      return undefined;
+    }
+
+    if (AppState.currentState === "active") {
+      resumeTimer();
+    }
+
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        resumeTimer();
+      } else {
+        pauseTimer();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [hasHydrated, pauseTimer, resumeTimer]);
+
+  useEffect(() => {
+    if (status !== "playing" || startedAt === null) {
       return undefined;
     }
 
@@ -64,7 +96,7 @@ export default function GameScreen() {
     previousStatusRef.current = status;
   }, [hasHydrated, playGameOver, status]);
 
-  const elapsedTime = formatElapsedTime(elapsedSeconds(startedAt, finishedAt, currentTime));
+  const elapsedTime = formatElapsedTime(elapsedSeconds(elapsedMs, startedAt, currentTime));
 
   if (!hasHydrated || isGenerating) {
     return (

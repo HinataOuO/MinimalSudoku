@@ -403,6 +403,7 @@ describe("game store timer", () => {
 
     expect(useGameStore.getState().startedAt).toBe(1_000);
     expect(useGameStore.getState().finishedAt).toBeNull();
+    expect(useGameStore.getState().elapsedMs).toBe(0);
   });
 
   it("restarts games with a fresh active timer", () => {
@@ -414,6 +415,46 @@ describe("game store timer", () => {
 
     expect(useGameStore.getState().startedAt).toBe(5_000);
     expect(useGameStore.getState().finishedAt).toBeNull();
+    expect(useGameStore.getState().elapsedMs).toBe(0);
+  });
+
+  it("pauses and resumes the active timer without counting time away", () => {
+    jest.spyOn(Date, "now").mockReturnValue(1_000);
+    useGameStore.getState().startNewGame("easy");
+
+    jest.spyOn(Date, "now").mockReturnValue(6_000);
+    useGameStore.getState().pauseTimer();
+
+    expect(useGameStore.getState().startedAt).toBeNull();
+    expect(useGameStore.getState().elapsedMs).toBe(5_000);
+
+    jest.spyOn(Date, "now").mockReturnValue(20_000);
+    useGameStore.getState().resumeTimer();
+
+    expect(useGameStore.getState().startedAt).toBe(20_000);
+    expect(useGameStore.getState().elapsedMs).toBe(5_000);
+
+    jest.spyOn(Date, "now").mockReturnValue(24_000);
+    useGameStore.getState().pauseTimer();
+
+    expect(useGameStore.getState().startedAt).toBeNull();
+    expect(useGameStore.getState().elapsedMs).toBe(9_000);
+  });
+
+  it("stops an active persisted timer on hydration without counting offline time", () => {
+    useGameStore.setState({
+      hasHydrated: false,
+      status: "playing",
+      startedAt: 1_000,
+      elapsedMs: 4_000
+    });
+
+    jest.spyOn(Date, "now").mockReturnValue(100_000);
+    useGameStore.getState().setHasHydrated(true);
+
+    expect(useGameStore.getState().hasHydrated).toBe(true);
+    expect(useGameStore.getState().startedAt).toBeNull();
+    expect(useGameStore.getState().elapsedMs).toBe(4_000);
   });
 
   it("stops the timer when the game is lost", () => {
@@ -436,6 +477,8 @@ describe("game store timer", () => {
 
     expect(useGameStore.getState().status).toBe("lost");
     expect(useGameStore.getState().finishedAt).toBe(9_000);
+    expect(useGameStore.getState().startedAt).toBeNull();
+    expect(useGameStore.getState().elapsedMs).toBe(8_000);
   });
 
   it("stops the timer when the puzzle is completed", () => {
@@ -456,6 +499,8 @@ describe("game store timer", () => {
 
     expect(useGameStore.getState().status).toBe("completed");
     expect(useGameStore.getState().finishedAt).toBe(12_000);
+    expect(useGameStore.getState().startedAt).toBeNull();
+    expect(useGameStore.getState().elapsedMs).toBe(11_000);
   });
 
   it("persists timer fields", () => {
@@ -470,6 +515,7 @@ describe("game store timer", () => {
 
     expect(persistedState.startedAt).toBe(1_000);
     expect(persistedState.finishedAt).toBeNull();
+    expect(persistedState.elapsedMs).toBe(0);
     expect(persistedState.highlightedNumber).toBeUndefined();
   });
 });

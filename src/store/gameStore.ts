@@ -44,11 +44,14 @@ type GameState = {
   moveHistory: MoveSnapshot[];
   startedAt: number | null;
   finishedAt: number | null;
+  elapsedMs: number;
   setHasHydrated: (hasHydrated: boolean) => void;
   toggleNoteMode: () => void;
   startNewGame: (difficulty: Difficulty) => void;
   startNewGameAsync: (difficulty: Difficulty) => Promise<void>;
   restartGame: () => void;
+  pauseTimer: () => void;
+  resumeTimer: () => void;
   selectCell: (cell: CellPosition) => void;
   setCellValue: (value: Exclude<CellValue, 0>) => void;
   highlightNumber: (value: FilledCellValue) => void;
@@ -76,6 +79,10 @@ function isPuzzleCompleted(grid: SudokuGrid, solution: SudokuGrid): boolean {
   );
 }
 
+function elapsedMsForSegment(startedAt: number | null, now: number): number {
+  return startedAt === null ? 0 : Math.max(0, now - startedAt);
+}
+
 export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
@@ -95,8 +102,13 @@ export const useGameStore = create<GameState>()(
       moveHistory: [],
       startedAt: null,
       finishedAt: null,
+      elapsedMs: 0,
 
-      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
+      setHasHydrated: (hasHydrated) =>
+        set((state) => ({
+          hasHydrated,
+          startedAt: hasHydrated && state.status === "playing" ? null : state.startedAt
+        })),
 
       toggleNoteMode: () => {
         set((state) => ({ isNoteMode: !state.isNoteMode }));
@@ -119,7 +131,8 @@ export const useGameStore = create<GameState>()(
           mistakeCount: 0,
           moveHistory: [],
           startedAt: Date.now(),
-          finishedAt: null
+          finishedAt: null,
+          elapsedMs: 0
         });
       },
 
@@ -139,7 +152,8 @@ export const useGameStore = create<GameState>()(
           mistakeCount: 0,
           moveHistory: [],
           startedAt: null,
-          finishedAt: null
+          finishedAt: null,
+          elapsedMs: 0
         });
 
         try {
@@ -161,7 +175,8 @@ export const useGameStore = create<GameState>()(
             mistakeCount: 0,
             moveHistory: [],
             startedAt: Date.now(),
-            finishedAt: null
+            finishedAt: null,
+            elapsedMs: 0
           });
         } catch (error) {
           set({
@@ -178,7 +193,8 @@ export const useGameStore = create<GameState>()(
             mistakeCount: 0,
             moveHistory: [],
             startedAt: null,
-            finishedAt: null
+            finishedAt: null,
+            elapsedMs: 0
           });
         }
       },
@@ -200,6 +216,31 @@ export const useGameStore = create<GameState>()(
           mistakes: {},
           mistakeCount: 0,
           moveHistory: [],
+          startedAt: Date.now(),
+          finishedAt: null,
+          elapsedMs: 0
+        });
+      },
+
+      pauseTimer: () => {
+        const { status, startedAt, elapsedMs } = get();
+        if (status !== "playing" || startedAt === null) {
+          return;
+        }
+
+        set({
+          startedAt: null,
+          elapsedMs: elapsedMs + elapsedMsForSegment(startedAt, Date.now())
+        });
+      },
+
+      resumeTimer: () => {
+        const { status, startedAt } = get();
+        if (status !== "playing" || startedAt !== null) {
+          return;
+        }
+
+        set({
           startedAt: Date.now(),
           finishedAt: null
         });
@@ -286,13 +327,19 @@ export const useGameStore = create<GameState>()(
           delete mistakes[mistakeKey];
         }
 
+        const now = Date.now();
+        const currentElapsedMs =
+          get().elapsedMs + elapsedMsForSegment(get().startedAt, now);
+
         set({
           userGrid: nextGrid,
           noteGrid: nextNoteGrid,
           mistakes,
           mistakeCount: nextMistakeCount,
           status: nextStatus,
-          finishedAt: nextStatus === "playing" ? null : Date.now(),
+          startedAt: nextStatus === "playing" ? get().startedAt : null,
+          finishedAt: nextStatus === "playing" ? null : now,
+          elapsedMs: nextStatus === "playing" ? get().elapsedMs : currentElapsedMs,
           moveHistory: [
             ...get().moveHistory,
             {
@@ -436,7 +483,8 @@ export const useGameStore = create<GameState>()(
         mistakeCount: state.mistakeCount,
         moveHistory: state.moveHistory,
         startedAt: state.startedAt,
-        finishedAt: state.finishedAt
+        finishedAt: state.finishedAt,
+        elapsedMs: state.elapsedMs
       })
     }
   )
