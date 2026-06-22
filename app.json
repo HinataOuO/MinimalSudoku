@@ -16,7 +16,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/img/icon.png",
+        "foregroundImage": "./assets/img/adaptive-icon.png",
+        "monochromeImage": "./assets/img/adaptive-icon-monochrome.png",
         "backgroundColor": "#ffcc19"
       },
       "package": "com.anonymous.minimalsudoku"
