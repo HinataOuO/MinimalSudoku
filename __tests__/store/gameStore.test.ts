@@ -55,6 +55,14 @@ function notesAt(cell: CellPosition) {
   return useGameStore.getState().noteGrid[cell.row][cell.col];
 }
 
+function partializeState() {
+  const partialize = (useGameStore as unknown as {
+    persist: { getOptions: () => { partialize: (state: unknown) => Record<string, unknown> } };
+  }).persist.getOptions().partialize;
+
+  return partialize(useGameStore.getState());
+}
+
 function wrongValueFor(
   solution: SudokuGrid,
   cell: CellPosition,
@@ -353,13 +361,115 @@ describe("game store notes", () => {
     useGameStore.getState().toggleNoteMode();
     useGameStore.getState().setCellValue(6);
 
-    const partialize = (useGameStore as unknown as {
-      persist: { getOptions: () => { partialize: (state: unknown) => Record<string, unknown> } };
-    }).persist.getOptions().partialize;
-    const persistedState = partialize(useGameStore.getState());
+    const persistedState = partializeState();
 
     expect((persistedState.noteGrid as FilledCellValue[][][])[cell.row][cell.col]).toEqual([6]);
     expect(persistedState.isNoteMode).toBeUndefined();
+  });
+});
+
+describe("game store hard mode", () => {
+  beforeEach(() => {
+    useGameStore.getState().setHardModeEnabled(false);
+    useGameStore.getState().startNewGame("easy");
+  });
+
+  afterEach(() => {
+    useGameStore.getState().setHardModeEnabled(false);
+  });
+
+  it("blocks replacing a correct entered value when hard mode is off", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+    const correctValue = valueAt(puzzle!.solution, cell) as FilledCellValue;
+    const wrongValue = wrongValueFor(puzzle!.solution, cell);
+
+    useGameStore.getState().selectCell(cell);
+    useGameStore.getState().setCellValue(correctValue);
+    useGameStore.getState().setCellValue(wrongValue);
+
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(correctValue);
+    expect(useGameStore.getState().mistakeCount).toBe(0);
+    expect(useGameStore.getState().moveHistory).toHaveLength(1);
+  });
+
+  it("does not clear a correct entered value when hard mode is off", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+    const correctValue = valueAt(puzzle!.solution, cell) as FilledCellValue;
+
+    useGameStore.getState().selectCell(cell);
+    useGameStore.getState().setCellValue(correctValue);
+    useGameStore.getState().clearSelectedCell();
+
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(correctValue);
+    expect(useGameStore.getState().moveHistory).toHaveLength(1);
+  });
+
+  it("allows replacing a wrong value when hard mode is off", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+    const wrongValue = wrongValueFor(puzzle!.solution, cell);
+    const correctValue = valueAt(puzzle!.solution, cell) as FilledCellValue;
+
+    useGameStore.getState().selectCell(cell);
+    useGameStore.getState().setCellValue(wrongValue);
+    useGameStore.getState().setCellValue(correctValue);
+
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(correctValue);
+    expect(useGameStore.getState().mistakes[`${cell.row}-${cell.col}`]).toBeUndefined();
+  });
+
+  it("allows replacing a correct entered value when hard mode is on", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+    const correctValue = valueAt(puzzle!.solution, cell) as FilledCellValue;
+    const wrongValue = wrongValueFor(puzzle!.solution, cell);
+
+    useGameStore.getState().setHardModeEnabled(true);
+    useGameStore.getState().selectCell(cell);
+    useGameStore.getState().setCellValue(correctValue);
+    useGameStore.getState().setCellValue(wrongValue);
+
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(wrongValue);
+    expect(useGameStore.getState().mistakes[`${cell.row}-${cell.col}`]).toBe(true);
+  });
+
+  it("persists hard mode", () => {
+    useGameStore.getState().setHardModeEnabled(true);
+
+    const persistedState = partializeState();
+
+    expect(persistedState.hardModeEnabled).toBe(true);
+  });
+});
+
+describe("game store theme mode", () => {
+  afterEach(() => {
+    useGameStore.getState().setThemeMode("dark");
+  });
+
+  it("defaults to dark theme", () => {
+    expect(useGameStore.getState().themeMode).toBe("dark");
+  });
+
+  it("toggles between dark and light theme", () => {
+    useGameStore.getState().setThemeMode("dark");
+    useGameStore.getState().toggleThemeMode();
+
+    expect(useGameStore.getState().themeMode).toBe("light");
+
+    useGameStore.getState().toggleThemeMode();
+
+    expect(useGameStore.getState().themeMode).toBe("dark");
+  });
+
+  it("persists theme mode", () => {
+    useGameStore.getState().setThemeMode("light");
+
+    const persistedState = partializeState();
+
+    expect(persistedState.themeMode).toBe("light");
   });
 });
 

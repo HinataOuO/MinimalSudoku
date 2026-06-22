@@ -10,7 +10,7 @@ import { NumberPad } from "@/components/NumberPad";
 import { SudokuGrid } from "@/components/SudokuGrid";
 import { useSound } from "@/audio/SoundProvider";
 import { useGameStore } from "@/store/gameStore";
-import { colors } from "@/theme/colors";
+import { useThemeColors } from "@/theme/colors";
 import { formatElapsedTime } from "@/utils/format";
 
 function elapsedSeconds(
@@ -37,6 +37,7 @@ export default function GameScreen() {
   const pauseTimer = useGameStore((state) => state.pauseTimer);
   const resumeTimer = useGameStore((state) => state.resumeTimer);
   const { playGameOver, playUiClick } = useSound();
+  const theme = useThemeColors();
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const previousStatusRef = useRef(status);
 
@@ -111,9 +112,16 @@ export default function GameScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView className="flex-1 justify-center gap-5 bg-canvas px-7">
-          <Text className="text-3xl font-medium text-ink">Generation failed</Text>
-          <Text className="text-base text-muted">{generationError}</Text>
+        <SafeAreaView
+          className="flex-1 justify-center gap-5 bg-canvas px-7"
+          style={{ backgroundColor: theme.canvas }}
+        >
+          <Text className="text-3xl font-medium text-ink" style={{ color: theme.ink }}>
+            Generation failed
+          </Text>
+          <Text className="text-base text-muted" style={{ color: theme.muted }}>
+            {generationError}
+          </Text>
           <Button label="Choose difficulty" onPress={() => router.replace("/difficulty")} />
         </SafeAreaView>
       </>
@@ -124,8 +132,13 @@ export default function GameScreen() {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
-        <SafeAreaView className="flex-1 justify-center gap-5 bg-canvas px-7">
-          <Text className="text-3xl font-medium text-ink">No puzzle yet</Text>
+        <SafeAreaView
+          className="flex-1 justify-center gap-5 bg-canvas px-7"
+          style={{ backgroundColor: theme.canvas }}
+        >
+          <Text className="text-3xl font-medium text-ink" style={{ color: theme.ink }}>
+            No puzzle yet
+          </Text>
           <Button label="Choose difficulty" onPress={() => router.replace("/difficulty")} />
         </SafeAreaView>
       </>
@@ -133,12 +146,18 @@ export default function GameScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-canvas px-4 pb-6 pt-3">
+    <SafeAreaView
+      className="flex-1 bg-canvas px-4 pb-6 pt-3"
+      style={{ backgroundColor: theme.canvas }}
+    >
       <Stack.Screen options={{ headerShown: false }} />
 
       <View className="relative h-11 justify-center">
         <View className="absolute left-0 right-0 items-center" pointerEvents="none">
-          <Text className="text-sm font-medium uppercase tracking-wide text-muted">
+          <Text
+            className="text-sm font-medium uppercase tracking-wide text-muted"
+            style={{ color: theme.muted }}
+          >
             {difficulty}
           </Text>
         </View>
@@ -152,8 +171,9 @@ export default function GameScreen() {
               restartGame();
             }}
             className="h-10 w-10 items-center justify-center rounded-md border border-line bg-transparent active:opacity-75"
+            style={{ borderColor: theme.line }}
           >
-            <RotateCcw color={colors.muted} size={20} strokeWidth={1.8} absoluteStrokeWidth />
+            <RotateCcw color={theme.muted} size={20} strokeWidth={1.8} absoluteStrokeWidth />
           </Pressable>
           <Pressable
             accessibilityLabel="Back to main menu"
@@ -164,20 +184,32 @@ export default function GameScreen() {
               router.replace("/");
             }}
             className="h-10 w-10 items-center justify-center rounded-md border border-line bg-transparent active:opacity-75"
+            style={{ borderColor: theme.line }}
           >
-            <Home color={colors.muted} size={20} strokeWidth={1.8} absoluteStrokeWidth />
+            <Home color={theme.muted} size={20} strokeWidth={1.8} absoluteStrokeWidth />
           </Pressable>
         </View>
       </View>
 
       <View className="flex-1 justify-center">
         <View className="items-center" style={{ marginBottom: 30 }}>
-          <Text className="text-xs font-medium uppercase tracking-wide text-muted">
+          <Text
+            className="text-xs font-medium uppercase tracking-wide text-muted"
+            style={{ color: theme.muted }}
+          >
             Errori {mistakeCount}/3
           </Text>
-          <View className="mt-2 flex-row items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5">
-            <Clock3 color={colors.muted} size={16} strokeWidth={1.8} absoluteStrokeWidth />
-            <Text className="text-base font-medium tabular-nums text-ink">{elapsedTime}</Text>
+          <View
+            className="mt-2 flex-row items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5"
+            style={{ backgroundColor: theme.panel, borderColor: theme.line }}
+          >
+            <Clock3 color={theme.muted} size={16} strokeWidth={1.8} absoluteStrokeWidth />
+            <Text
+              className="text-base font-medium tabular-nums text-ink"
+              style={{ color: theme.ink }}
+            >
+              {elapsedTime}
+            </Text>
           </View>
         </View>
         <SudokuGrid />
@@ -186,15 +218,31 @@ export default function GameScreen() {
         </View>
 
         {status === "completed" ? (
-          <View className="mt-5 gap-4 rounded-md border border-line bg-panel p-4">
-            <Text className="text-center text-lg font-medium text-accent">Puzzle completed</Text>
+          <View
+            className="mt-5 gap-4 rounded-md border border-line bg-panel p-4"
+            style={{ backgroundColor: theme.panel, borderColor: theme.line }}
+          >
+            <Text
+              className="text-center text-lg font-medium text-accent"
+              style={{ color: theme.accent }}
+            >
+              Puzzle completed
+            </Text>
             <Button label="New game" onPress={() => router.replace("/difficulty")} />
           </View>
         ) : null}
 
         {status === "lost" ? (
-          <View className="mt-5 gap-4 rounded-md border border-line bg-panel p-4">
-            <Text className="text-center text-lg font-medium text-danger">Game over</Text>
+          <View
+            className="mt-5 gap-4 rounded-md border border-line bg-panel p-4"
+            style={{ backgroundColor: theme.panel, borderColor: theme.line }}
+          >
+            <Text
+              className="text-center text-lg font-medium text-danger"
+              style={{ color: theme.danger }}
+            >
+              Game over
+            </Text>
             <Button label="Back home" onPress={() => router.replace("/")} />
           </View>
         ) : null}

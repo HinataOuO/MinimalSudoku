@@ -1,9 +1,9 @@
 import { Fragment } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 
-import { CellPosition } from "@/features/sudoku/types";
+import { CellPosition, CellValue, FilledCellValue } from "@/features/sudoku/types";
 import { useGameStore } from "@/store/gameStore";
-import { colors } from "@/theme/colors";
+import { useThemeColors } from "@/theme/colors";
 
 const lineWidth = 1;
 const highlightBleed = lineWidth;
@@ -23,6 +23,24 @@ function isRelated(a: CellPosition, b: CellPosition) {
   );
 }
 
+export function isProminentCell(
+  row: number,
+  col: number,
+  value: CellValue,
+  selectedCell: CellPosition | null,
+  selectedValue: CellValue,
+  highlightedNumber: FilledCellValue | null
+) {
+  if (highlightedNumber !== null) {
+    return value === highlightedNumber;
+  }
+
+  const isSelected = selectedCell?.row === row && selectedCell?.col === col;
+  const matchesSelectedValue = selectedValue !== 0 && value === selectedValue;
+
+  return isSelected || matchesSelectedValue;
+}
+
 export function SudokuGrid() {
   const { width, height } = useWindowDimensions();
   const puzzle = useGameStore((state) => state.puzzle);
@@ -32,6 +50,7 @@ export function SudokuGrid() {
   const highlightedNumber = useGameStore((state) => state.highlightedNumber);
   const mistakes = useGameStore((state) => state.mistakes);
   const selectCell = useGameStore((state) => state.selectCell);
+  const theme = useThemeColors();
 
   if (!puzzle || !userGrid) {
     return null;
@@ -44,15 +63,6 @@ export function SudokuGrid() {
   );
   const selectedValue = selectedCell ? userGrid[selectedCell.row][selectedCell.col] : 0;
 
-  function isProminentCell(row: number, col: number, value: number) {
-    const isSelected = selectedCell?.row === row && selectedCell?.col === col;
-    const matchesLongPressValue = highlightedNumber !== null && value === highlightedNumber;
-    const matchesSelectedValue =
-      highlightedNumber === null && selectedValue !== 0 && value === selectedValue;
-
-    return isSelected || matchesLongPressValue || matchesSelectedValue;
-  }
-
   return (
     <View
       className="self-center overflow-hidden rounded-sm"
@@ -61,8 +71,8 @@ export function SudokuGrid() {
         height: size,
         padding: lineWidth,
         gap: lineWidth,
-        backgroundColor: colors.line,
-        shadowColor: colors.accent,
+        backgroundColor: theme.line,
+        shadowColor: theme.accent,
         shadowOffset: { width: 0, height: 10 },
         shadowOpacity: 0.04,
         shadowRadius: 24,
@@ -75,7 +85,14 @@ export function SudokuGrid() {
             const position = { row: rowIndex, col: colIndex };
             const fixed = puzzle.givens[rowIndex][colIndex] !== 0;
             const related = selectedCell ? isRelated(position, selectedCell) : false;
-            const isProminentMatch = isProminentCell(rowIndex, colIndex, value);
+            const isProminentMatch = isProminentCell(
+              rowIndex,
+              colIndex,
+              value,
+              selectedCell,
+              selectedValue,
+              highlightedNumber
+            );
             const mistake = mistakes[`${rowIndex}-${colIndex}`] === true;
             const notes = noteGrid[rowIndex][colIndex];
             const noteGridSize = cellSize - 4;
@@ -92,14 +109,14 @@ export function SudokuGrid() {
                   width: cellSize,
                   height: cellSize,
                   backgroundColor: mistake
-                    ? colors.dangerSoft
+                    ? theme.dangerSoft
                     : isProminentMatch
-                      ? colors.selectedCell
+                      ? theme.selectedCell
                       : related
-                        ? colors.relatedCell
+                        ? theme.relatedCell
                         : fixed
-                          ? colors.fixedCell
-                          : colors.emptyCell
+                          ? theme.fixedCell
+                          : theme.emptyCell
                 }}
               >
                 {value === 0 && notes.length > 0 ? (
@@ -115,6 +132,7 @@ export function SudokuGrid() {
                             <Text
                               className="font-medium text-muted"
                               style={{
+                                color: theme.muted,
                                 fontSize: noteFontSize,
                                 lineHeight: noteCellSize,
                                 textAlign: "center"
@@ -135,7 +153,8 @@ export function SudokuGrid() {
                     style={{
                       fontSize: Math.max(20, cellSize * 0.58),
                       letterSpacing: 0.2,
-                      lineHeight: Math.max(22, cellSize * 0.64)
+                      lineHeight: Math.max(22, cellSize * 0.64),
+                      color: mistake ? theme.danger : fixed ? theme.ink : theme.accent
                     }}
                   >
                     {value === 0 ? "" : value}
@@ -156,7 +175,7 @@ export function SudokuGrid() {
             top: 0,
             bottom: 0,
             width: lineWidth,
-            backgroundColor: colors.strongLine
+            backgroundColor: theme.strongLine
           }}
         />
       ))}
@@ -170,13 +189,22 @@ export function SudokuGrid() {
             right: 0,
             top: position,
             height: lineWidth,
-            backgroundColor: colors.strongLine
+            backgroundColor: theme.strongLine
           }}
         />
       ))}
       {userGrid.map((row, rowIndex) =>
         row.map((value, colIndex) => {
-          if (!isProminentCell(rowIndex, colIndex, value)) {
+          if (
+            !isProminentCell(
+              rowIndex,
+              colIndex,
+              value,
+              selectedCell,
+              selectedValue,
+              highlightedNumber
+            )
+          ) {
             return null;
           }
 
@@ -185,7 +213,7 @@ export function SudokuGrid() {
           const highlightSize = cellSize + highlightBleed * 2;
           const highlightOffset = highlightSize - highlightBorderWidth;
           const highlightShadow = {
-            shadowColor: colors.accent,
+            shadowColor: theme.accent,
             shadowOffset: { width: 0, height: 0 },
             shadowOpacity: 0.32,
             shadowRadius: 9,
@@ -202,7 +230,7 @@ export function SudokuGrid() {
                   top,
                   width: highlightSize,
                   height: highlightBorderWidth,
-                  backgroundColor: colors.accent,
+                  backgroundColor: theme.accent,
                   ...highlightShadow
                 }}
               />
@@ -214,7 +242,7 @@ export function SudokuGrid() {
                   top: top + highlightOffset,
                   width: highlightSize,
                   height: highlightBorderWidth,
-                  backgroundColor: colors.accent,
+                  backgroundColor: theme.accent,
                   ...highlightShadow
                 }}
               />
@@ -226,7 +254,7 @@ export function SudokuGrid() {
                   top,
                   width: highlightBorderWidth,
                   height: highlightSize,
-                  backgroundColor: colors.accent,
+                  backgroundColor: theme.accent,
                   ...highlightShadow
                 }}
               />
@@ -238,7 +266,7 @@ export function SudokuGrid() {
                   top,
                   width: highlightBorderWidth,
                   height: highlightSize,
-                  backgroundColor: colors.accent,
+                  backgroundColor: theme.accent,
                   ...highlightShadow
                 }}
               />

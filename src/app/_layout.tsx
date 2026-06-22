@@ -4,18 +4,22 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 
 import { SoundProvider } from "@/audio/SoundProvider";
-import { colors } from "@/theme/colors";
+import { useGameStore } from "@/store/gameStore";
+import { useThemeColors } from "@/theme/colors";
 
 export default function RootLayout() {
+  const theme = useThemeColors();
+  const themeMode = useGameStore((state) => state.themeMode);
+
   return (
     <SoundProvider>
-      <StatusBar style="light" />
+      <StatusBar style={themeMode === "dark" ? "light" : "dark"} />
       <Stack
         screenOptions={{
-          contentStyle: { backgroundColor: colors.canvas },
+          contentStyle: { backgroundColor: theme.canvas },
           headerShadowVisible: false,
-          headerStyle: { backgroundColor: colors.canvas },
-          headerTitleStyle: { color: colors.ink, fontWeight: "700" }
+          headerStyle: { backgroundColor: theme.canvas },
+          headerTitleStyle: { color: theme.ink, fontWeight: "700" }
         }}
       />
     </SoundProvider>

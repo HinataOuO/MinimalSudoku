@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSound } from "@/audio/SoundProvider";
 import { DIFFICULTIES, type Difficulty } from "@/features/sudoku/types";
 import { useGameStore } from "@/store/gameStore";
+import { useThemeColors } from "@/theme/colors";
 
 type DifficultyDetails = {
   label: string;
@@ -37,17 +38,24 @@ const difficultyDetails: Record<Difficulty, DifficultyDetails> = {
 
 export default function DifficultyScreen() {
   const startNewGameAsync = useGameStore((state) => state.startNewGameAsync);
+  const theme = useThemeColors();
 
   return (
-    <SafeAreaView className="flex-1 bg-canvas px-7">
+    <SafeAreaView className="flex-1 bg-canvas px-7" style={{ backgroundColor: theme.canvas }}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <View className="flex-1 justify-center gap-10">
         <View className="items-center gap-4">
-          <Text className="text-center text-5xl font-medium tracking-wide text-ink">
+          <Text
+            className="text-center text-5xl font-medium tracking-wide text-ink"
+            style={{ color: theme.ink }}
+          >
             Choose your level
           </Text>
-          <Text className="max-w-sm text-center text-lg leading-7 text-muted">
+          <Text
+            className="max-w-sm text-center text-lg leading-7 text-muted"
+            style={{ color: theme.muted }}
+          >
             Pick the pace for your next grid.
           </Text>
         </View>
@@ -72,6 +80,7 @@ export default function DifficultyScreen() {
 function DifficultyTile({ difficulty, onPress }: { difficulty: Difficulty; onPress: () => void }) {
   const details = difficultyDetails[difficulty];
   const { playUiClick } = useSound();
+  const theme = useThemeColors();
 
   return (
     <Pressable
@@ -83,11 +92,19 @@ function DifficultyTile({ difficulty, onPress }: { difficulty: Difficulty; onPre
         onPress();
       }}
       className="rounded-md border border-line bg-panel px-5 py-4 active:bg-accentSoft"
+      style={{ backgroundColor: theme.panel, borderColor: theme.line }}
     >
       <View className="flex-row items-center justify-between gap-4">
         <View className="flex-1 gap-1">
-          <Text className="text-xl font-medium tracking-wide text-ink">{details.label}</Text>
-          <Text className="text-sm leading-5 text-muted">{details.description}</Text>
+          <Text
+            className="text-xl font-medium tracking-wide text-ink"
+            style={{ color: theme.ink }}
+          >
+            {details.label}
+          </Text>
+          <Text className="text-sm leading-5 text-muted" style={{ color: theme.muted }}>
+            {details.description}
+          </Text>
         </View>
 
         <View className="flex-row items-end gap-1.5">
@@ -97,7 +114,10 @@ function DifficultyTile({ difficulty, onPress }: { difficulty: Difficulty; onPre
               className={`w-2 rounded-full ${
                 level <= details.intensity ? "bg-accent" : "bg-strongLine"
               }`}
-              style={{ height: 10 + level * 4 }}
+              style={{
+                backgroundColor: level <= details.intensity ? theme.accent : theme.strongLine,
+                height: 10 + level * 4
+              }}
             />
           ))}
         </View>

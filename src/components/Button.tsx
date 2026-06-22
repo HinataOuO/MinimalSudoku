@@ -2,6 +2,7 @@ import { forwardRef, type ElementRef, type ReactNode } from "react";
 import { Pressable, Text, View, type PressableProps } from "react-native";
 
 import { useSound } from "@/audio/SoundProvider";
+import { useThemeColors } from "@/theme/colors";
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
 
@@ -37,6 +38,19 @@ export const Button = forwardRef<ElementRef<typeof Pressable>, ButtonProps>(func
   ref
 ) {
   const { playUiClick } = useSound();
+  const theme = useThemeColors();
+
+  const buttonStyle: Record<ButtonVariant, { backgroundColor: string; borderColor: string }> = {
+    primary: { backgroundColor: theme.accent, borderColor: theme.accent },
+    secondary: { backgroundColor: theme.panelElevated, borderColor: theme.line },
+    ghost: { backgroundColor: "transparent", borderColor: theme.line }
+  };
+
+  const textStyle: Record<ButtonVariant, { color: string }> = {
+    primary: { color: theme.accentInk },
+    secondary: { color: theme.ink },
+    ghost: { color: theme.muted }
+  };
 
   return (
     <Pressable
@@ -52,10 +66,14 @@ export const Button = forwardRef<ElementRef<typeof Pressable>, ButtonProps>(func
       className={`items-center justify-center rounded-md border px-5 py-3 ${
         buttonClass[variant]
       } ${disabled ? "opacity-35" : "active:opacity-75"} ${className}`}
+      style={buttonStyle[variant]}
     >
       <View className="flex-row items-center justify-center gap-2">
         {icon}
-        <Text className={`text-base font-medium tracking-wide ${textClass[variant]}`}>
+        <Text
+          className={`text-base font-medium tracking-wide ${textClass[variant]}`}
+          style={textStyle[variant]}
+        >
           {label}
         </Text>
       </View>

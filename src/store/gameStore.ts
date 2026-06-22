@@ -13,6 +13,7 @@ import {
   SudokuPuzzle
 } from "@/features/sudoku/types";
 import { cloneGrid } from "@/features/sudoku/validator";
+import { defaultThemeMode, type ThemeMode } from "@/theme/types";
 
 type MistakeMap = Record<string, boolean>;
 type NoteGrid = FilledCellValue[][][];
@@ -35,6 +36,8 @@ type GameState = {
   userGrid: SudokuGrid | null;
   noteGrid: NoteGrid;
   isNoteMode: boolean;
+  hardModeEnabled: boolean;
+  themeMode: ThemeMode;
   selectedCell: CellPosition | null;
   highlightedNumber: FilledCellValue | null;
   difficulty: Difficulty;
@@ -46,6 +49,9 @@ type GameState = {
   finishedAt: number | null;
   elapsedMs: number;
   setHasHydrated: (hasHydrated: boolean) => void;
+  setHardModeEnabled: (enabled: boolean) => void;
+  setThemeMode: (themeMode: ThemeMode) => void;
+  toggleThemeMode: () => void;
   toggleNoteMode: () => void;
   startNewGame: (difficulty: Difficulty) => void;
   startNewGameAsync: (difficulty: Difficulty) => Promise<void>;
@@ -93,6 +99,8 @@ export const useGameStore = create<GameState>()(
       userGrid: null,
       noteGrid: createEmptyNoteGrid(),
       isNoteMode: false,
+      hardModeEnabled: false,
+      themeMode: defaultThemeMode,
       selectedCell: null,
       highlightedNumber: null,
       difficulty: "easy",
@@ -112,6 +120,18 @@ export const useGameStore = create<GameState>()(
 
       toggleNoteMode: () => {
         set((state) => ({ isNoteMode: !state.isNoteMode }));
+      },
+
+      setHardModeEnabled: (enabled) => {
+        set({ hardModeEnabled: enabled });
+      },
+
+      setThemeMode: (themeMode) => {
+        set({ themeMode });
+      },
+
+      toggleThemeMode: () => {
+        set((state) => ({ themeMode: state.themeMode === "dark" ? "light" : "dark" }));
       },
 
       startNewGame: (difficulty) => {
@@ -256,7 +276,15 @@ export const useGameStore = create<GameState>()(
       },
 
       setCellValue: (value) => {
-        const { puzzle, selectedCell, status, userGrid, noteGrid, isNoteMode } = get();
+        const {
+          puzzle,
+          selectedCell,
+          status,
+          userGrid,
+          noteGrid,
+          isNoteMode,
+          hardModeEnabled
+        } = get();
         if (!puzzle || !selectedCell || !userGrid) {
           return;
         }
@@ -270,6 +298,12 @@ export const useGameStore = create<GameState>()(
         }
 
         const currentValue = userGrid[selectedCell.row][selectedCell.col];
+        const currentValueIsCorrect =
+          currentValue === puzzle.solution[selectedCell.row][selectedCell.col];
+        if (!hardModeEnabled && currentValueIsCorrect) {
+          return;
+        }
+
         if (isNoteMode) {
           if (currentValue !== 0) {
             return;
@@ -364,7 +398,7 @@ export const useGameStore = create<GameState>()(
       },
 
       clearSelectedCell: () => {
-        const { puzzle, selectedCell, status, userGrid, noteGrid } = get();
+        const { puzzle, selectedCell, status, userGrid, noteGrid, hardModeEnabled } = get();
         if (!puzzle || !selectedCell || !userGrid) {
           return;
         }
@@ -377,7 +411,15 @@ export const useGameStore = create<GameState>()(
           return;
         }
 
-        if (userGrid[selectedCell.row][selectedCell.col] === 0) {
+        const currentValue = userGrid[selectedCell.row][selectedCell.col];
+        if (currentValue === 0) {
+          return;
+        }
+
+        if (
+          !hardModeEnabled &&
+          currentValue === puzzle.solution[selectedCell.row][selectedCell.col]
+        ) {
           return;
         }
 
@@ -476,6 +518,8 @@ export const useGameStore = create<GameState>()(
         puzzle: state.puzzle,
         userGrid: state.userGrid,
         noteGrid: state.noteGrid,
+        hardModeEnabled: state.hardModeEnabled,
+        themeMode: state.themeMode,
         selectedCell: state.selectedCell,
         difficulty: state.difficulty,
         status: state.status,

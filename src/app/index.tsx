@@ -7,12 +7,13 @@ import { useSound } from "@/audio/SoundProvider";
 import { Button } from "@/components/Button";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { useGameStore } from "@/store/gameStore";
-import { colors } from "@/theme/colors";
+import { useThemeColors } from "@/theme/colors";
 
 export default function HomeScreen() {
   const hasHydrated = useGameStore((state) => state.hasHydrated);
   const hasGame = useGameStore((state) => state.puzzle !== null && state.status === "playing");
   const { playUiClick } = useSound();
+  const theme = useThemeColors();
 
   if (!hasHydrated) {
     return (
@@ -24,7 +25,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-canvas px-7">
+    <SafeAreaView className="flex-1 bg-canvas px-7" style={{ backgroundColor: theme.canvas }}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <Pressable
@@ -36,16 +37,23 @@ export default function HomeScreen() {
           router.push("/settings" as Href);
         }}
         className="absolute left-7 top-[88px] z-10 h-10 w-10 items-center justify-center rounded-md border border-line bg-transparent active:opacity-75"
+        style={{ borderColor: theme.line }}
       >
-        <Settings color={colors.muted} size={20} strokeWidth={1.8} absoluteStrokeWidth />
+        <Settings color={theme.muted} size={20} strokeWidth={1.8} absoluteStrokeWidth />
       </Pressable>
 
       <View className="flex-1 justify-center gap-10">
         <View className="items-center gap-4">
-          <Text className="text-center text-5xl font-medium tracking-wide text-ink">
+          <Text
+            className="text-center text-5xl font-medium tracking-wide text-ink"
+            style={{ color: theme.ink }}
+          >
             Minimal Sudoku
           </Text>
-          <Text className="max-w-sm text-center text-lg leading-7 text-muted">
+          <Text
+            className="max-w-sm text-center text-lg leading-7 text-muted"
+            style={{ color: theme.muted }}
+          >
             Clean offline puzzles. Choose a difficulty, solve the grid, come back anytime.
           </Text>
         </View>
@@ -54,7 +62,7 @@ export default function HomeScreen() {
           <Link href="/difficulty" asChild>
             <Button
               icon={
-                <Grid3X3 color={colors.accentInk} size={20} strokeWidth={1.9} absoluteStrokeWidth />
+                <Grid3X3 color={theme.accentInk} size={20} strokeWidth={1.9} absoluteStrokeWidth />
               }
               label="New Game"
             />
@@ -63,7 +71,7 @@ export default function HomeScreen() {
             <Link href="/game" asChild>
               <Button
                 icon={
-                  <Play color={colors.ink} size={20} strokeWidth={1.9} absoluteStrokeWidth />
+                  <Play color={theme.ink} size={20} strokeWidth={1.9} absoluteStrokeWidth />
                 }
                 label="Continue"
                 variant="secondary"
