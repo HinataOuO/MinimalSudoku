@@ -8,7 +8,7 @@ module.exports = {
         ink: "#F2F2F2",
         muted: "#8A8A8A",
         line: "#222222",
-        strongLine: "#333333",
+        strongLine: "#464646",
         panel: "#111111",
         panelElevated: "#151515",
         canvas: "#0A0A0A",
