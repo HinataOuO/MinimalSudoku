@@ -4,6 +4,11 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { generatePuzzle } from "@/features/sudoku/generator";
 import {
+  solveSharedGame,
+  validateSharedGamePayload,
+  type SharedGamePayload
+} from "@/features/sharing/sharedGame";
+import {
   CellPosition,
   CellValue,
   Difficulty,
@@ -62,6 +67,7 @@ type GameState = {
   setRapidInputValue: (value: FilledCellValue) => void;
   startNewGame: (difficulty: Difficulty) => void;
   startNewGameAsync: (difficulty: Difficulty) => Promise<void>;
+  startSharedGame: (payload: SharedGamePayload) => boolean;
   restartGame: () => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
@@ -413,6 +419,49 @@ export const useGameStore = create<GameState>()(
             elapsedMs: 0
           });
         }
+      },
+
+      startSharedGame: (payload) => {
+        const validation = validateSharedGamePayload(payload);
+        if (!validation.ok) {
+          return false;
+        }
+
+        const validPayload = validation.payload;
+        const solution = solveSharedGame(validPayload);
+        if (!solution) {
+          return false;
+        }
+
+        const puzzle: SudokuPuzzle = {
+          givens: cloneGrid(validPayload.givens),
+          solution,
+          difficulty: validPayload.difficulty
+        };
+
+        set({
+          puzzle,
+          userGrid: cloneGrid(puzzle.givens),
+          noteGrid: createEmptyNoteGrid(),
+          isNoteMode: false,
+          isRapidInputMode: false,
+          rapidInputValue: null,
+          arcadeModeEnabled: validPayload.arcadeModeEnabled,
+          selectedCell: null,
+          highlightedNumber: null,
+          difficulty: validPayload.difficulty,
+          status: "playing",
+          isGenerating: false,
+          generationError: null,
+          mistakes: {},
+          mistakeCount: 0,
+          moveHistory: [],
+          startedAt: Date.now(),
+          finishedAt: null,
+          elapsedMs: 0
+        });
+
+        return true;
       },
 
       restartGame: () => {

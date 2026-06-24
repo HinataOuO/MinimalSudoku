@@ -3,6 +3,7 @@ jest.mock("@react-native-async-storage/async-storage", () =>
 );
 
 import { migrateGameStoreState, useGameStore } from "@/store/gameStore";
+import { createSharedGamePayload } from "@/features/sharing/sharedGame";
 import { CellPosition, FilledCellValue, SudokuGrid } from "@/features/sudoku/types";
 
 function findEditableCell(grid: SudokuGrid): CellPosition {
@@ -591,6 +592,66 @@ describe("game store generation", () => {
     expect(useGameStore.getState().status).toBe("playing");
     expect(useGameStore.getState().noteGrid.flat(2)).toEqual([]);
     expect(useGameStore.getState().isNoteMode).toBe(false);
+  });
+});
+
+describe("game store shared games", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("imports givens and settings while clearing local progress", () => {
+    useGameStore.getState().startNewGame("easy");
+    const sharedPuzzle = useGameStore.getState().puzzle!;
+    const sharedPayload = createSharedGamePayload(
+      "expert",
+      false,
+      sharedPuzzle.givens
+    );
+    const editableCell = findEditableCell(sharedPuzzle.givens);
+
+    useGameStore.getState().selectCell(editableCell);
+    useGameStore.getState().toggleNoteMode();
+    useGameStore.getState().setCellValue(4);
+    useGameStore.getState().highlightNumber(4);
+
+    jest.spyOn(Date, "now").mockReturnValue(42_000);
+    const imported = useGameStore.getState().startSharedGame(sharedPayload);
+    const state = useGameStore.getState();
+
+    expect(imported).toBe(true);
+    expect(state.puzzle?.givens).toEqual(sharedPuzzle.givens);
+    expect(state.puzzle?.solution).toEqual(sharedPuzzle.solution);
+    expect(state.userGrid).toEqual(sharedPuzzle.givens);
+    expect(state.difficulty).toBe("expert");
+    expect(state.arcadeModeEnabled).toBe(false);
+    expect(state.status).toBe("playing");
+    expect(state.noteGrid.flat(2)).toEqual([]);
+    expect(state.isNoteMode).toBe(false);
+    expect(state.isRapidInputMode).toBe(false);
+    expect(state.selectedCell).toBeNull();
+    expect(state.highlightedNumber).toBeNull();
+    expect(state.mistakes).toEqual({});
+    expect(state.mistakeCount).toBe(0);
+    expect(state.moveHistory).toEqual([]);
+    expect(state.startedAt).toBe(42_000);
+    expect(state.finishedAt).toBeNull();
+    expect(state.elapsedMs).toBe(0);
+  });
+
+  it("does not change state for invalid shared data", () => {
+    useGameStore.getState().startNewGame("easy");
+    const previousPuzzle = useGameStore.getState().puzzle;
+
+    const imported = useGameStore.getState().startSharedGame({
+      version: 1,
+      difficulty: "easy",
+      arcadeModeEnabled: true,
+      givens: Array.from({ length: 9 }, () => Array(9).fill(0))
+    });
+
+    expect(imported).toBe(false);
+    expect(useGameStore.getState().puzzle).toBe(previousPuzzle);
   });
 });
 

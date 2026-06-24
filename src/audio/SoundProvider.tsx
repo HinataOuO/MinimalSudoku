@@ -14,6 +14,7 @@ type SoundControls = {
   muted: boolean;
   playGameOver: () => void;
   playUiClick: () => void;
+  playVictory: () => void;
   setVolume: (volume: number) => void;
   toggleMuted: () => void;
   volume: number;
@@ -35,6 +36,7 @@ const SoundContext = createContext<SoundControls>({
   muted: defaultAudioSettings.muted,
   playGameOver: () => undefined,
   playUiClick: () => undefined,
+  playVictory: () => undefined,
   setVolume: () => undefined,
   toggleMuted: () => undefined,
   volume: defaultAudioSettings.volume
@@ -88,11 +90,13 @@ function playFromStart(player: AudioPlayer) {
 }
 
 const clickSound = require("../../assets/audio/click.mp3") as AudioSource;
-const gameOverSound = require("../../assets/audio/gameOver.mp3") as AudioSource;
+const gameOverSound = require("../../assets/audio/lose.mp3") as AudioSource;
+const victorySound = require("../../assets/audio/win.mp3") as AudioSource;
 
 export function SoundProvider({ children }: { children: ReactNode }) {
   const clickPlayer = useAudioPlayer(clickSound);
   const gameOverPlayer = useAudioPlayer(gameOverSound);
+  const victoryPlayer = useAudioPlayer(victorySound);
   const [volume, setVolumeState] = useState(defaultAudioSettings.volume);
   const [muted, setMuted] = useState(defaultAudioSettings.muted);
   const settingsRef = useRef<AudioSettingsState>(defaultAudioSettings);
@@ -103,8 +107,9 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     (nextSettings: AudioSettingsState) => {
       applyAudioSettingsToPlayer(clickPlayer, nextSettings);
       applyAudioSettingsToPlayer(gameOverPlayer, nextSettings);
+      applyAudioSettingsToPlayer(victoryPlayer, nextSettings);
     },
-    [clickPlayer, gameOverPlayer]
+    [clickPlayer, gameOverPlayer, victoryPlayer]
   );
 
   const persistQueuedAudioSettings = useCallback((nextSettings: AudioSettingsState) => {
@@ -176,6 +181,10 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     playFromStart(gameOverPlayer);
   }, [gameOverPlayer]);
 
+  const playVictory = useCallback(() => {
+    playFromStart(victoryPlayer);
+  }, [victoryPlayer]);
+
   const setVolume = useCallback((nextVolume: number) => {
     const clampedVolume = clampVolume(nextVolume);
     const nextSettings = normalizeAudioSettings({
@@ -208,7 +217,7 @@ export function SoundProvider({ children }: { children: ReactNode }) {
 
   return (
     <SoundContext.Provider
-      value={{ muted, playGameOver, playUiClick, setVolume, toggleMuted, volume }}
+      value={{ muted, playGameOver, playUiClick, playVictory, setVolume, toggleMuted, volume }}
     >
       {children}
     </SoundContext.Provider>
