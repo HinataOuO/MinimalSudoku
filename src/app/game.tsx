@@ -23,6 +23,71 @@ function elapsedSeconds(
   return Math.floor((elapsedMs + activeElapsedMs) / 1000);
 }
 
+type GameResultScreenProps = {
+  elapsedTime: string;
+  result: "completed" | "lost";
+};
+
+function GameResultScreen({ elapsedTime, result }: GameResultScreenProps) {
+  const { playUiClick } = useSound();
+  const theme = useThemeColors();
+  const completed = result === "completed";
+
+  return (
+    <SafeAreaView
+      className="flex-1 bg-canvas px-7 py-8"
+      style={{ backgroundColor: theme.canvas }}
+    >
+      <Stack.Screen options={{ headerShown: false }} />
+
+      <View className="flex-1">
+        <View className="flex-[3] items-center justify-end gap-4">
+          <Text
+            adjustsFontSizeToFit
+            accessibilityLabel={`Final time ${elapsedTime}`}
+            className="w-full text-center font-medium tabular-nums text-ink"
+            minimumFontScale={0.55}
+            numberOfLines={1}
+            style={{ color: theme.ink, fontSize: 96, lineHeight: 108 }}
+          >
+            {elapsedTime}
+          </Text>
+          <Text
+            accessibilityRole="header"
+            className="text-center text-4xl font-medium uppercase tracking-widest"
+            style={{ color: completed ? theme.success : theme.danger }}
+          >
+            {completed ? "DONE" : "FAILED"}
+          </Text>
+        </View>
+
+        <View className="flex-[2] items-center justify-center">
+          <Pressable
+            accessibilityLabel="Back to main menu"
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => {
+              playUiClick();
+              router.replace("/");
+            }}
+            className="w-24 items-center justify-center gap-1 rounded-md border border-line bg-panel px-2 py-2 active:bg-accentSoft"
+            style={{ backgroundColor: theme.panel, borderColor: theme.line }}
+          >
+            <Home color={theme.muted} size={24} strokeWidth={1.8} absoluteStrokeWidth />
+            <Text
+              className="text-xs font-medium uppercase tracking-wide text-muted"
+              style={{ color: theme.muted }}
+            >
+              Home
+            </Text>
+          </Pressable>
+        </View>
+        <View className="flex-[2]" />
+      </View>
+    </SafeAreaView>
+  );
+}
+
 export default function GameScreen() {
   const hasHydrated = useGameStore((state) => state.hasHydrated);
   const difficulty = useGameStore((state) => state.difficulty);
@@ -145,6 +210,10 @@ export default function GameScreen() {
     );
   }
 
+  if (status === "completed" || status === "lost") {
+    return <GameResultScreen elapsedTime={elapsedTime} result={status} />;
+  }
+
   return (
     <SafeAreaView
       className="flex-1 bg-canvas px-4 pb-6 pt-3"
@@ -216,36 +285,6 @@ export default function GameScreen() {
         <View style={{ marginTop: 56 }}>
           <NumberPad />
         </View>
-
-        {status === "completed" ? (
-          <View
-            className="mt-5 gap-4 rounded-md border border-line bg-panel p-4"
-            style={{ backgroundColor: theme.panel, borderColor: theme.line }}
-          >
-            <Text
-              className="text-center text-lg font-medium text-accent"
-              style={{ color: theme.accent }}
-            >
-              Puzzle completed
-            </Text>
-            <Button label="New game" onPress={() => router.replace("/difficulty")} />
-          </View>
-        ) : null}
-
-        {status === "lost" ? (
-          <View
-            className="mt-5 gap-4 rounded-md border border-line bg-panel p-4"
-            style={{ backgroundColor: theme.panel, borderColor: theme.line }}
-          >
-            <Text
-              className="text-center text-lg font-medium text-danger"
-              style={{ color: theme.danger }}
-            >
-              Game over
-            </Text>
-            <Button label="Back home" onPress={() => router.replace("/")} />
-          </View>
-        ) : null}
       </View>
     </SafeAreaView>
   );

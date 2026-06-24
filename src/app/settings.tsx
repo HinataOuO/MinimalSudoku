@@ -101,8 +101,8 @@ export default function SettingsScreen() {
 }
 
 function GameplaySettings() {
-  const hardModeEnabled = useGameStore((state) => state.hardModeEnabled);
-  const setHardModeEnabled = useGameStore((state) => state.setHardModeEnabled);
+  const arcadeModeEnabled = useGameStore((state) => state.arcadeModeEnabled);
+  const setArcadeModeEnabled = useGameStore((state) => state.setArcadeModeEnabled);
   const { playUiClick } = useSound();
   const theme = useThemeColors();
 
@@ -121,22 +121,22 @@ function GameplaySettings() {
       <View className="flex-row items-center justify-between gap-4">
         <View className="flex-1 gap-1">
           <Text className="text-base font-medium text-ink" style={{ color: theme.ink }}>
-            Hard mode
+            Arcade
           </Text>
           <Text className="text-sm leading-5 text-muted" style={{ color: theme.muted }}>
-            Allows changing correct numbers you entered. Starting clues stay locked.
+            Enables rapid input and disables completed numbers.
           </Text>
         </View>
         <Switch
-          accessibilityLabel="Toggle hard mode"
+          accessibilityLabel="Toggle arcade mode"
           accessibilityRole="switch"
           onValueChange={(enabled) => {
-            setHardModeEnabled(enabled);
+            setArcadeModeEnabled(enabled);
             playUiClick();
           }}
-          thumbColor={hardModeEnabled ? theme.accentInk : theme.muted}
+          thumbColor={arcadeModeEnabled ? theme.accentInk : theme.muted}
           trackColor={{ false: theme.line, true: theme.accent }}
-          value={hardModeEnabled}
+          value={arcadeModeEnabled}
         />
       </View>
     </View>

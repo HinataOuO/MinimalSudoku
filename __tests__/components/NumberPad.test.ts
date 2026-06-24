@@ -37,22 +37,22 @@ function gridWithCompletedNumber(number: FilledCellValue): SudokuGrid {
 }
 
 describe("getCompletedNumberPadValues", () => {
-  it("marks a completed number when hard mode is off", () => {
+  it("marks a completed number when arcade mode is on", () => {
     const completedNumbers = getCompletedNumberPadValues(
       numbers,
       puzzle,
       gridWithCompletedNumber(1),
-      false
+      true
     );
 
     expect(completedNumbers).toContain(1);
   });
 
-  it("does not mark an incomplete number when hard mode is off", () => {
+  it("does not mark an incomplete number when arcade mode is on", () => {
     const userGrid = gridWithCompletedNumber(1);
     userGrid[0][0] = 0;
 
-    const completedNumbers = getCompletedNumberPadValues(numbers, puzzle, userGrid, false);
+    const completedNumbers = getCompletedNumberPadValues(numbers, puzzle, userGrid, true);
 
     expect(completedNumbers).not.toContain(1);
   });
@@ -61,7 +61,7 @@ describe("getCompletedNumberPadValues", () => {
     const userGrid = gridWithCompletedNumber(1);
     userGrid[0][0] = 2;
 
-    const completedNumbers = getCompletedNumberPadValues(numbers, puzzle, userGrid, false);
+    const completedNumbers = getCompletedNumberPadValues(numbers, puzzle, userGrid, true);
 
     expect(completedNumbers).not.toContain(1);
   });
@@ -71,18 +71,18 @@ describe("getCompletedNumberPadValues", () => {
       numbers,
       puzzleWithCompletedGivenNumber,
       puzzleWithCompletedGivenNumber.givens,
-      false
+      true
     );
 
     expect(completedNumbers).toContain(1);
   });
 
-  it("does not mark a completed number when hard mode is on", () => {
+  it("keeps a completed number available when arcade mode is off", () => {
     const completedNumbers = getCompletedNumberPadValues(
       numbers,
       puzzle,
       gridWithCompletedNumber(1),
-      true
+      false
     );
 
     expect(completedNumbers).not.toContain(1);

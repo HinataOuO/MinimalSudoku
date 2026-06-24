@@ -12,11 +12,14 @@ import {
   SudokuGrid,
   SudokuPuzzle
 } from "@/features/sudoku/types";
-import { cloneGrid } from "@/features/sudoku/validator";
+import { cloneGrid, isNumberCompleted } from "@/features/sudoku/validator";
 import { defaultThemeMode, type ThemeMode } from "@/theme/types";
 
 type MistakeMap = Record<string, boolean>;
 type NoteGrid = FilledCellValue[][][];
+type LegacyPersistedGameState = Record<string, unknown> & {
+  hardModeEnabled?: boolean;
+};
 
 type MoveSnapshot = {
   userGrid: SudokuGrid;
@@ -36,7 +39,9 @@ type GameState = {
   userGrid: SudokuGrid | null;
   noteGrid: NoteGrid;
   isNoteMode: boolean;
-  hardModeEnabled: boolean;
+  isRapidInputMode: boolean;
+  rapidInputValue: FilledCellValue | null;
+  arcadeModeEnabled: boolean;
   themeMode: ThemeMode;
   selectedCell: CellPosition | null;
   highlightedNumber: FilledCellValue | null;
@@ -49,16 +54,19 @@ type GameState = {
   finishedAt: number | null;
   elapsedMs: number;
   setHasHydrated: (hasHydrated: boolean) => void;
-  setHardModeEnabled: (enabled: boolean) => void;
+  setArcadeModeEnabled: (enabled: boolean) => void;
   setThemeMode: (themeMode: ThemeMode) => void;
   toggleThemeMode: () => void;
   toggleNoteMode: () => void;
+  toggleRapidInputMode: () => void;
+  setRapidInputValue: (value: FilledCellValue) => void;
   startNewGame: (difficulty: Difficulty) => void;
   startNewGameAsync: (difficulty: Difficulty) => Promise<void>;
   restartGame: () => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
   selectCell: (cell: CellPosition) => void;
+  pressCell: (cell: CellPosition) => void;
   setCellValue: (value: Exclude<CellValue, 0>) => void;
   highlightNumber: (value: FilledCellValue) => void;
   clearHighlightedNumber: () => void;
@@ -89,41 +97,221 @@ function elapsedMsForSegment(startedAt: number | null, now: number): number {
   return startedAt === null ? 0 : Math.max(0, now - startedAt);
 }
 
+export function migrateGameStoreState(
+  persistedState: unknown,
+  version: number
+): unknown {
+  if (
+    version >= 1 ||
+    persistedState === null ||
+    typeof persistedState !== "object" ||
+    Array.isArray(persistedState)
+  ) {
+    return persistedState;
+  }
+
+  const {
+    hardModeEnabled: _legacyHardModeEnabled,
+    ...state
+  } = persistedState as LegacyPersistedGameState;
+
+  return {
+    ...state,
+    arcadeModeEnabled: true
+  };
+}
+
 export const useGameStore = create<GameState>()(
   persist(
-    (set, get) => ({
-      hasHydrated: false,
-      isGenerating: false,
-      generationError: null,
-      puzzle: null,
-      userGrid: null,
-      noteGrid: createEmptyNoteGrid(),
-      isNoteMode: false,
-      hardModeEnabled: false,
-      themeMode: defaultThemeMode,
-      selectedCell: null,
-      highlightedNumber: null,
-      difficulty: "easy",
-      status: "idle",
-      mistakes: {},
-      mistakeCount: 0,
-      moveHistory: [],
-      startedAt: null,
-      finishedAt: null,
-      elapsedMs: 0,
+    (set, get) => {
+      const applyCellValue = (
+        cell: CellPosition,
+        value: FilledCellValue,
+        noteMode: boolean,
+        historySelectedCell: CellPosition | null
+      ) => {
+        const {
+          arcadeModeEnabled,
+          isRapidInputMode,
+          noteGrid,
+          puzzle,
+          rapidInputValue,
+          status,
+          userGrid
+        } = get();
+        if (!puzzle || !userGrid || status !== "playing") {
+          return;
+        }
 
-      setHasHydrated: (hasHydrated) =>
-        set((state) => ({
-          hasHydrated,
-          startedAt: hasHydrated && state.status === "playing" ? null : state.startedAt
-        })),
+        if (puzzle.givens[cell.row][cell.col] !== 0) {
+          return;
+        }
 
-      toggleNoteMode: () => {
-        set((state) => ({ isNoteMode: !state.isNoteMode }));
+        const currentValue = userGrid[cell.row][cell.col];
+        const currentValueIsCorrect = currentValue === puzzle.solution[cell.row][cell.col];
+        if (currentValueIsCorrect) {
+          return;
+        }
+
+        if (noteMode) {
+          if (currentValue !== 0) {
+            return;
+          }
+
+          const currentNotes = noteGrid[cell.row][cell.col];
+          const nextNotes = currentNotes.includes(value)
+            ? currentNotes.filter((note) => note !== value)
+            : [...currentNotes, value].sort((a, b) => a - b);
+          const nextNoteGrid = cloneNoteGrid(noteGrid);
+          nextNoteGrid[cell.row][cell.col] = nextNotes;
+
+          set({
+            noteGrid: nextNoteGrid,
+            moveHistory: [
+              ...get().moveHistory,
+              {
+                userGrid: cloneGrid(userGrid),
+                noteGrid: cloneNoteGrid(noteGrid),
+                selectedCell: historySelectedCell,
+                status: get().status,
+                mistakes: { ...get().mistakes },
+                mistakeCount: get().mistakeCount,
+                finishedAt: get().finishedAt
+              }
+            ]
+          });
+          return;
+        }
+
+        if (currentValue === value) {
+          return;
+        }
+
+        const nextGrid = cloneGrid(userGrid);
+        nextGrid[cell.row][cell.col] = value;
+        const nextNoteGrid = cloneNoteGrid(noteGrid);
+        nextNoteGrid[cell.row][cell.col] = [];
+
+        const mistakeKey = keyForCell(cell);
+        const mistakes = { ...get().mistakes };
+        const isMistake = puzzle.solution[cell.row][cell.col] !== value;
+        const nextMistakeCount = isMistake ? get().mistakeCount + 1 : get().mistakeCount;
+        const nextStatus = isMistake
+          ? nextMistakeCount >= 3
+            ? "lost"
+            : "playing"
+          : isPuzzleCompleted(nextGrid, puzzle.solution)
+            ? "completed"
+            : "playing";
+        const rapidNumberCompleted =
+          !isMistake &&
+          arcadeModeEnabled &&
+          isRapidInputMode &&
+          rapidInputValue === value &&
+          isNumberCompleted(nextGrid, puzzle.solution, value);
+
+        if (isMistake) {
+          mistakes[mistakeKey] = true;
+        } else {
+          delete mistakes[mistakeKey];
+        }
+
+        const now = Date.now();
+        const currentElapsedMs =
+          get().elapsedMs + elapsedMsForSegment(get().startedAt, now);
+
+        set({
+          userGrid: nextGrid,
+          noteGrid: nextNoteGrid,
+          mistakes,
+          mistakeCount: nextMistakeCount,
+          status: nextStatus,
+          startedAt: nextStatus === "playing" ? get().startedAt : null,
+          finishedAt: nextStatus === "playing" ? null : now,
+          elapsedMs: nextStatus === "playing" ? get().elapsedMs : currentElapsedMs,
+          rapidInputValue: rapidNumberCompleted ? null : rapidInputValue,
+          moveHistory: [
+            ...get().moveHistory,
+            {
+              userGrid: cloneGrid(userGrid),
+              noteGrid: cloneNoteGrid(noteGrid),
+              selectedCell: historySelectedCell,
+              status: get().status,
+              mistakes: { ...get().mistakes },
+              mistakeCount: get().mistakeCount,
+              finishedAt: get().finishedAt
+            }
+          ]
+        });
+      };
+
+      return {
+        hasHydrated: false,
+        isGenerating: false,
+        generationError: null,
+        puzzle: null,
+        userGrid: null,
+        noteGrid: createEmptyNoteGrid(),
+        isNoteMode: false,
+        isRapidInputMode: false,
+        rapidInputValue: null,
+        arcadeModeEnabled: true,
+        themeMode: defaultThemeMode,
+        selectedCell: null,
+        highlightedNumber: null,
+        difficulty: "easy",
+        status: "idle",
+        mistakes: {},
+        mistakeCount: 0,
+        moveHistory: [],
+        startedAt: null,
+        finishedAt: null,
+        elapsedMs: 0,
+
+        setHasHydrated: (hasHydrated) =>
+          set((state) => ({
+            hasHydrated,
+            startedAt: hasHydrated && state.status === "playing" ? null : state.startedAt
+          })),
+
+        toggleNoteMode: () => {
+          set((state) => ({
+            isNoteMode: !state.isNoteMode,
+            isRapidInputMode: state.isNoteMode ? state.isRapidInputMode : false,
+            rapidInputValue: state.isNoteMode ? state.rapidInputValue : null
+          }));
+        },
+
+      toggleRapidInputMode: () => {
+        set((state) => {
+          if (!state.arcadeModeEnabled || state.status !== "playing") {
+            return {};
+          }
+
+          const isRapidInputMode = !state.isRapidInputMode;
+          return {
+            isRapidInputMode,
+            rapidInputValue: isRapidInputMode ? state.rapidInputValue : null,
+            isNoteMode: isRapidInputMode ? false : state.isNoteMode
+          };
+        });
       },
 
-      setHardModeEnabled: (enabled) => {
-        set({ hardModeEnabled: enabled });
+      setRapidInputValue: (value) => {
+        const { arcadeModeEnabled, isRapidInputMode, status } = get();
+        if (!arcadeModeEnabled || !isRapidInputMode || status !== "playing") {
+          return;
+        }
+
+        set({ rapidInputValue: value });
+      },
+
+      setArcadeModeEnabled: (enabled) => {
+        set({
+          arcadeModeEnabled: enabled,
+          isRapidInputMode: false,
+          rapidInputValue: null
+        });
       },
 
       setThemeMode: (themeMode) => {
@@ -141,6 +329,8 @@ export const useGameStore = create<GameState>()(
           userGrid: cloneGrid(puzzle.givens),
           noteGrid: createEmptyNoteGrid(),
           isNoteMode: false,
+          isRapidInputMode: false,
+          rapidInputValue: null,
           selectedCell: null,
           highlightedNumber: null,
           difficulty,
@@ -165,6 +355,8 @@ export const useGameStore = create<GameState>()(
           userGrid: null,
           noteGrid: createEmptyNoteGrid(),
           isNoteMode: false,
+          isRapidInputMode: false,
+          rapidInputValue: null,
           selectedCell: null,
           highlightedNumber: null,
           status: "idle",
@@ -185,6 +377,8 @@ export const useGameStore = create<GameState>()(
             userGrid: cloneGrid(puzzle.givens),
             noteGrid: createEmptyNoteGrid(),
             isNoteMode: false,
+            isRapidInputMode: false,
+            rapidInputValue: null,
             selectedCell: null,
             highlightedNumber: null,
             difficulty,
@@ -207,6 +401,8 @@ export const useGameStore = create<GameState>()(
             userGrid: null,
             noteGrid: createEmptyNoteGrid(),
             isNoteMode: false,
+            isRapidInputMode: false,
+            rapidInputValue: null,
             selectedCell: null,
             highlightedNumber: null,
             mistakes: {},
@@ -229,6 +425,8 @@ export const useGameStore = create<GameState>()(
           userGrid: cloneGrid(puzzle.givens),
           noteGrid: createEmptyNoteGrid(),
           isNoteMode: false,
+          isRapidInputMode: false,
+          rapidInputValue: null,
           selectedCell: null,
           highlightedNumber: null,
           status: "playing",
@@ -275,118 +473,32 @@ export const useGameStore = create<GameState>()(
         set({ selectedCell: cell });
       },
 
-      setCellValue: (value) => {
+      pressCell: (cell) => {
         const {
-          puzzle,
+          arcadeModeEnabled,
+          isRapidInputMode,
+          rapidInputValue,
           selectedCell,
-          status,
-          userGrid,
-          noteGrid,
-          isNoteMode,
-          hardModeEnabled
+          status
         } = get();
-        if (!puzzle || !selectedCell || !userGrid) {
-          return;
-        }
-
         if (status !== "playing") {
           return;
         }
 
-        if (puzzle.givens[selectedCell.row][selectedCell.col] !== 0) {
+        set({ selectedCell: cell });
+
+        if (arcadeModeEnabled && isRapidInputMode && rapidInputValue !== null) {
+          applyCellValue(cell, rapidInputValue, false, selectedCell);
+        }
+      },
+
+      setCellValue: (value) => {
+        const { selectedCell, isNoteMode } = get();
+        if (!selectedCell) {
           return;
         }
 
-        const currentValue = userGrid[selectedCell.row][selectedCell.col];
-        const currentValueIsCorrect =
-          currentValue === puzzle.solution[selectedCell.row][selectedCell.col];
-        if (!hardModeEnabled && currentValueIsCorrect) {
-          return;
-        }
-
-        if (isNoteMode) {
-          if (currentValue !== 0) {
-            return;
-          }
-
-          const currentNotes = noteGrid[selectedCell.row][selectedCell.col];
-          const nextNotes = currentNotes.includes(value)
-            ? currentNotes.filter((note) => note !== value)
-            : [...currentNotes, value].sort((a, b) => a - b);
-          const nextNoteGrid = cloneNoteGrid(noteGrid);
-          nextNoteGrid[selectedCell.row][selectedCell.col] = nextNotes;
-
-          set({
-            noteGrid: nextNoteGrid,
-            moveHistory: [
-              ...get().moveHistory,
-              {
-                userGrid: cloneGrid(userGrid),
-                noteGrid: cloneNoteGrid(noteGrid),
-                selectedCell,
-                status: get().status,
-                mistakes: { ...get().mistakes },
-                mistakeCount: get().mistakeCount,
-                finishedAt: get().finishedAt
-              }
-            ]
-          });
-          return;
-        }
-
-        if (currentValue === value) {
-          return;
-        }
-
-        const nextGrid = cloneGrid(userGrid);
-        nextGrid[selectedCell.row][selectedCell.col] = value;
-        const nextNoteGrid = cloneNoteGrid(noteGrid);
-        nextNoteGrid[selectedCell.row][selectedCell.col] = [];
-
-        const mistakeKey = keyForCell(selectedCell);
-        const mistakes = { ...get().mistakes };
-        const isMistake = puzzle.solution[selectedCell.row][selectedCell.col] !== value;
-        const nextMistakeCount = isMistake ? get().mistakeCount + 1 : get().mistakeCount;
-        const nextStatus = isMistake
-          ? nextMistakeCount >= 3
-            ? "lost"
-            : "playing"
-          : isPuzzleCompleted(nextGrid, puzzle.solution)
-            ? "completed"
-            : "playing";
-
-        if (isMistake) {
-          mistakes[mistakeKey] = true;
-        } else {
-          delete mistakes[mistakeKey];
-        }
-
-        const now = Date.now();
-        const currentElapsedMs =
-          get().elapsedMs + elapsedMsForSegment(get().startedAt, now);
-
-        set({
-          userGrid: nextGrid,
-          noteGrid: nextNoteGrid,
-          mistakes,
-          mistakeCount: nextMistakeCount,
-          status: nextStatus,
-          startedAt: nextStatus === "playing" ? get().startedAt : null,
-          finishedAt: nextStatus === "playing" ? null : now,
-          elapsedMs: nextStatus === "playing" ? get().elapsedMs : currentElapsedMs,
-          moveHistory: [
-            ...get().moveHistory,
-            {
-              userGrid: cloneGrid(userGrid),
-              noteGrid: cloneNoteGrid(noteGrid),
-              selectedCell,
-              status: get().status,
-              mistakes: { ...get().mistakes },
-              mistakeCount: get().mistakeCount,
-              finishedAt: get().finishedAt
-            }
-          ]
-        });
+        applyCellValue(selectedCell, value, isNoteMode, selectedCell);
       },
 
       highlightNumber: (value) => {
@@ -398,7 +510,7 @@ export const useGameStore = create<GameState>()(
       },
 
       clearSelectedCell: () => {
-        const { puzzle, selectedCell, status, userGrid, noteGrid, hardModeEnabled } = get();
+        const { puzzle, selectedCell, status, userGrid, noteGrid } = get();
         if (!puzzle || !selectedCell || !userGrid) {
           return;
         }
@@ -416,10 +528,7 @@ export const useGameStore = create<GameState>()(
           return;
         }
 
-        if (
-          !hardModeEnabled &&
-          currentValue === puzzle.solution[selectedCell.row][selectedCell.col]
-        ) {
+        if (currentValue === puzzle.solution[selectedCell.row][selectedCell.col]) {
           return;
         }
 
@@ -507,10 +616,14 @@ export const useGameStore = create<GameState>()(
           moveHistory: moveHistory.slice(0, -1)
         });
       }
-    }),
+      };
+    },
     {
       name: "minimal-sudoku-game",
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
+      migrate: (persistedState, version) =>
+        migrateGameStoreState(persistedState, version) as GameState,
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },
@@ -518,7 +631,7 @@ export const useGameStore = create<GameState>()(
         puzzle: state.puzzle,
         userGrid: state.userGrid,
         noteGrid: state.noteGrid,
-        hardModeEnabled: state.hardModeEnabled,
+        arcadeModeEnabled: state.arcadeModeEnabled,
         themeMode: state.themeMode,
         selectedCell: state.selectedCell,
         difficulty: state.difficulty,

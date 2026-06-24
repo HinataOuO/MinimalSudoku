@@ -1,4 +1,10 @@
-import { BOX_SIZE, EMPTY_CELL, GRID_SIZE, SudokuGrid } from "./types";
+import {
+  BOX_SIZE,
+  EMPTY_CELL,
+  FilledCellValue,
+  GRID_SIZE,
+  SudokuGrid
+} from "./types";
 
 export function cloneGrid(grid: SudokuGrid): SudokuGrid {
   return grid.map((row) => [...row]) as SudokuGrid;
@@ -52,6 +58,18 @@ export function canPlaceValue(
 
 export function isCompleteGrid(grid: SudokuGrid): boolean {
   return isValidGridShape(grid) && grid.every((row) => row.every((cell) => cell !== EMPTY_CELL));
+}
+
+export function isNumberCompleted(
+  grid: SudokuGrid,
+  solution: SudokuGrid,
+  number: FilledCellValue
+): boolean {
+  return solution.every((row, rowIndex) =>
+    row.every((solutionValue, colIndex) => {
+      return solutionValue !== number || grid[rowIndex][colIndex] === number;
+    })
+  );
 }
 
 export function isSolvedGrid(grid: SudokuGrid): boolean {

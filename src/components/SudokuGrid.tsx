@@ -41,6 +41,18 @@ export function isProminentCell(
   return isSelected || matchesSelectedValue;
 }
 
+export function getHighlightedNumber(
+  highlightedNumber: FilledCellValue | null,
+  isRapidInputMode: boolean,
+  rapidInputValue: FilledCellValue | null
+): FilledCellValue | null {
+  if (highlightedNumber !== null) {
+    return highlightedNumber;
+  }
+
+  return isRapidInputMode ? rapidInputValue : null;
+}
+
 export function SudokuGrid() {
   const { width, height } = useWindowDimensions();
   const puzzle = useGameStore((state) => state.puzzle);
@@ -48,8 +60,10 @@ export function SudokuGrid() {
   const noteGrid = useGameStore((state) => state.noteGrid);
   const selectedCell = useGameStore((state) => state.selectedCell);
   const highlightedNumber = useGameStore((state) => state.highlightedNumber);
+  const isRapidInputMode = useGameStore((state) => state.isRapidInputMode);
+  const rapidInputValue = useGameStore((state) => state.rapidInputValue);
   const mistakes = useGameStore((state) => state.mistakes);
-  const selectCell = useGameStore((state) => state.selectCell);
+  const pressCell = useGameStore((state) => state.pressCell);
   const theme = useThemeColors();
 
   if (!puzzle || !userGrid) {
@@ -62,6 +76,11 @@ export function SudokuGrid() {
     (boundary) => lineWidth + boundary * cellSize + (boundary - 1) * lineWidth
   );
   const selectedValue = selectedCell ? userGrid[selectedCell.row][selectedCell.col] : 0;
+  const activeHighlightedNumber = getHighlightedNumber(
+    highlightedNumber,
+    isRapidInputMode,
+    rapidInputValue
+  );
 
   return (
     <View
@@ -91,7 +110,7 @@ export function SudokuGrid() {
               value,
               selectedCell,
               selectedValue,
-              highlightedNumber
+              activeHighlightedNumber
             );
             const mistake = mistakes[`${rowIndex}-${colIndex}`] === true;
             const notes = noteGrid[rowIndex][colIndex];
@@ -103,7 +122,7 @@ export function SudokuGrid() {
               <Pressable
                 key={`${rowIndex}-${colIndex}`}
                 accessibilityRole="button"
-                onPress={() => selectCell(position)}
+                onPress={() => pressCell(position)}
                 className="items-center justify-center"
                 style={{
                   width: cellSize,
@@ -202,7 +221,7 @@ export function SudokuGrid() {
               value,
               selectedCell,
               selectedValue,
-              highlightedNumber
+              activeHighlightedNumber
             )
           ) {
             return null;

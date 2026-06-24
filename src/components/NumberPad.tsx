@@ -1,46 +1,33 @@
 import { Pressable, Text, View } from "react-native";
-import { Eraser, Pencil, Undo2 } from "lucide-react-native";
+import { Eraser, Pencil, Undo2, Zap } from "lucide-react-native";
 
 import { useSound } from "@/audio/SoundProvider";
 import { FilledCellValue, SudokuGrid, SudokuPuzzle } from "@/features/sudoku/types";
+import { isNumberCompleted } from "@/features/sudoku/validator";
 import { useGameStore } from "@/store/gameStore";
 import { useThemeColors } from "@/theme/colors";
 
 const numbers: FilledCellValue[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-function isNumberCompleted(
-  number: FilledCellValue,
-  puzzle: SudokuPuzzle,
-  userGrid: SudokuGrid
-): boolean {
-  for (let row = 0; row < puzzle.solution.length; row += 1) {
-    for (let col = 0; col < puzzle.solution[row].length; col += 1) {
-      if (puzzle.solution[row][col] === number && userGrid[row][col] !== number) {
-        return false;
-      }
-    }
-  }
-
-  return true;
-}
-
 export function getCompletedNumberPadValues(
   values: FilledCellValue[],
   puzzle: SudokuPuzzle | null,
   userGrid: SudokuGrid | null,
-  hardModeEnabled: boolean
+  arcadeModeEnabled: boolean
 ): FilledCellValue[] {
-  if (hardModeEnabled || puzzle === null || userGrid === null) {
+  if (!arcadeModeEnabled || puzzle === null || userGrid === null) {
     return [];
   }
 
-  return values.filter((number) => isNumberCompleted(number, puzzle, userGrid));
+  return values.filter((number) => isNumberCompleted(userGrid, puzzle.solution, number));
 }
 
 export function NumberPad() {
   const setCellValue = useGameStore((state) => state.setCellValue);
   const undoLastMove = useGameStore((state) => state.undoLastMove);
   const toggleNoteMode = useGameStore((state) => state.toggleNoteMode);
+  const toggleRapidInputMode = useGameStore((state) => state.toggleRapidInputMode);
+  const setRapidInputValue = useGameStore((state) => state.setRapidInputValue);
   const clearSelectedCellNotes = useGameStore((state) => state.clearSelectedCellNotes);
   const canUndo = useGameStore(
     (state) => state.status === "playing" && state.moveHistory.length > 0
@@ -51,7 +38,9 @@ export function NumberPad() {
   const status = useGameStore((state) => state.status);
   const noteGrid = useGameStore((state) => state.noteGrid);
   const isNoteMode = useGameStore((state) => state.isNoteMode);
-  const hardModeEnabled = useGameStore((state) => state.hardModeEnabled);
+  const isRapidInputMode = useGameStore((state) => state.isRapidInputMode);
+  const rapidInputValue = useGameStore((state) => state.rapidInputValue);
+  const arcadeModeEnabled = useGameStore((state) => state.arcadeModeEnabled);
   const highlightNumber = useGameStore((state) => state.highlightNumber);
   const clearHighlightedNumber = useGameStore((state) => state.clearHighlightedNumber);
   const { playUiClick } = useSound();
@@ -63,9 +52,8 @@ export function NumberPad() {
     userGrid !== null &&
     selectedCell !== null &&
     puzzle.givens[selectedCell.row][selectedCell.col] === 0 &&
-    (hardModeEnabled ||
-      userGrid[selectedCell.row][selectedCell.col] !==
-        puzzle.solution[selectedCell.row][selectedCell.col]);
+    userGrid[selectedCell.row][selectedCell.col] !==
+      puzzle.solution[selectedCell.row][selectedCell.col];
   const selectedCellHasNotes =
     selectedCell !== null && noteGrid[selectedCell.row][selectedCell.col].length > 0;
   const canClearNotes = canEnterValue && selectedCellHasNotes;
@@ -73,7 +61,7 @@ export function NumberPad() {
     numbers,
     puzzle,
     userGrid,
-    hardModeEnabled
+    arcadeModeEnabled
   );
 
   return (
@@ -88,7 +76,7 @@ export function NumberPad() {
             playUiClick();
             undoLastMove();
           }}
-          className={`items-center justify-center gap-1 rounded-md border border-line px-4 py-2 ${
+          className={`flex-1 items-center justify-center gap-1 rounded-md border border-line px-2 py-2 ${
             canUndo ? "bg-panel active:bg-accentSoft" : "bg-transparent opacity-35"
           }`}
           style={{
@@ -113,7 +101,7 @@ export function NumberPad() {
             playUiClick();
             toggleNoteMode();
           }}
-          className={`items-center justify-center gap-1 rounded-md border px-4 py-2 ${
+          className={`flex-1 items-center justify-center gap-1 rounded-md border px-2 py-2 ${
             isNoteMode
               ? "border-accent bg-accentSoft"
               : status === "playing"
@@ -153,7 +141,7 @@ export function NumberPad() {
             playUiClick();
             clearSelectedCellNotes();
           }}
-          className={`items-center justify-center gap-1 rounded-md border border-line px-4 py-2 ${
+          className={`flex-1 items-center justify-center gap-1 rounded-md border border-line px-2 py-2 ${
             canClearNotes ? "bg-panel active:bg-accentSoft" : "bg-transparent opacity-35"
           }`}
           style={{
@@ -169,32 +157,87 @@ export function NumberPad() {
             Erase
           </Text>
         </Pressable>
+        {arcadeModeEnabled ? (
+          <Pressable
+            accessibilityLabel="Toggle rapid input mode"
+            accessibilityRole="button"
+            disabled={status !== "playing"}
+            hitSlop={8}
+            onPress={() => {
+              playUiClick();
+              toggleRapidInputMode();
+            }}
+            className={`flex-1 items-center justify-center gap-1 rounded-md border px-2 py-2 ${
+              isRapidInputMode
+                ? "border-accent bg-accentSoft"
+                : status === "playing"
+                  ? "border-line bg-panel active:bg-accentSoft"
+                  : "border-line bg-transparent opacity-35"
+            }`}
+            style={{
+              backgroundColor: isRapidInputMode
+                ? theme.accentSoft
+                : status === "playing"
+                  ? theme.panel
+                  : "transparent",
+              borderColor: isRapidInputMode ? theme.accent : theme.line
+            }}
+          >
+            <Zap
+              color={isRapidInputMode ? theme.accent : theme.muted}
+              size={24}
+              strokeWidth={1.8}
+              absoluteStrokeWidth
+            />
+            <Text
+              className={`text-xs font-medium uppercase tracking-wide ${
+                isRapidInputMode ? "text-accent" : "text-muted"
+              }`}
+              style={{ color: isRapidInputMode ? theme.accent : theme.muted }}
+            >
+              Rapid
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <View className="flex-row gap-2">
         {numbers.map((number) => {
           const numberCompleted = completedNumbers.includes(number);
           const disabled = numberPadDisabled || numberCompleted;
+          const rapidNumberSelected = isRapidInputMode && rapidInputValue === number;
 
           return (
             <Pressable
               key={number}
-              accessibilityLabel={`Enter ${number}`}
+              accessibilityLabel={
+                isRapidInputMode ? `Select ${number} for rapid input` : `Enter ${number}`
+              }
               accessibilityRole="button"
+              accessibilityState={{ disabled, selected: rapidNumberSelected }}
               disabled={disabled}
               delayLongPress={200}
               hitSlop={4}
               onLongPress={() => highlightNumber(number)}
               onPress={() => {
-                if (canEnterValue && !numberCompleted) {
+                if (isRapidInputMode) {
+                  setRapidInputValue(number);
+                } else if (canEnterValue && !numberCompleted) {
                   setCellValue(number);
                 }
               }}
               onPressOut={clearHighlightedNumber}
-              className={`h-16 flex-1 items-center justify-center rounded-md border border-line bg-panelElevated ${
+              className={`h-16 flex-1 items-center justify-center rounded-md border ${
+                rapidNumberSelected
+                  ? "border-accent bg-accentSoft"
+                  : "border-line bg-panelElevated"
+              } ${
                 disabled ? "opacity-35" : "active:bg-accentSoft"
               }`}
-              style={{ backgroundColor: theme.panelElevated, borderColor: theme.line }}
+              style={{
+                backgroundColor: rapidNumberSelected ? theme.accentSoft : theme.panelElevated,
+                borderColor: rapidNumberSelected ? theme.accent : theme.line
+              }}
             >
               <Text
                 className={`text-3xl font-medium ${

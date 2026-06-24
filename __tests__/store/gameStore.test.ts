@@ -2,7 +2,7 @@ jest.mock("@react-native-async-storage/async-storage", () =>
   require("@react-native-async-storage/async-storage/jest/async-storage-mock")
 );
 
-import { useGameStore } from "@/store/gameStore";
+import { migrateGameStoreState, useGameStore } from "@/store/gameStore";
 import { CellPosition, FilledCellValue, SudokuGrid } from "@/features/sudoku/types";
 
 function findEditableCell(grid: SudokuGrid): CellPosition {
@@ -47,6 +47,61 @@ function findTwoEditableCells(grid: SudokuGrid): [CellPosition, CellPosition] {
   return [cells[0], cells[1]];
 }
 
+function findOtherSolutionCell(
+  solution: SudokuGrid,
+  value: FilledCellValue,
+  excludedCell: CellPosition
+): CellPosition {
+  for (let row = 0; row < solution.length; row += 1) {
+    for (let col = 0; col < solution[row].length; col += 1) {
+      if (
+        solution[row][col] === value &&
+        (row !== excludedCell.row || col !== excludedCell.col)
+      ) {
+        return { row, col };
+      }
+    }
+  }
+
+  throw new Error("Expected another solution cell for value");
+}
+
+function findEditableCellWithDifferentSolutionValue(
+  givens: SudokuGrid,
+  solution: SudokuGrid,
+  value: FilledCellValue
+): CellPosition {
+  for (let row = 0; row < givens.length; row += 1) {
+    for (let col = 0; col < givens[row].length; col += 1) {
+      if (givens[row][col] === 0 && solution[row][col] !== value) {
+        return { row, col };
+      }
+    }
+  }
+
+  throw new Error("Expected editable cell with a different solution value");
+}
+
+function gridWithMissingNumberCells(
+  givens: SudokuGrid,
+  solution: SudokuGrid,
+  value: FilledCellValue,
+  missingCells: CellPosition[]
+): SudokuGrid {
+  return solution.map((row, rowIndex) =>
+    row.map((solutionValue, colIndex) => {
+      if (solutionValue !== value) {
+        return givens[rowIndex][colIndex];
+      }
+
+      const isMissing = missingCells.some(
+        (cell) => cell.row === rowIndex && cell.col === colIndex
+      );
+      return isMissing ? 0 : value;
+    })
+  );
+}
+
 function valueAt(grid: SudokuGrid, cell: CellPosition) {
   return grid[cell.row][cell.col];
 }
@@ -61,6 +116,12 @@ function partializeState() {
   }).persist.getOptions().partialize;
 
   return partialize(useGameStore.getState());
+}
+
+function persistenceOptions() {
+  return (useGameStore as unknown as {
+    persist: { getOptions: () => { version?: number } };
+  }).persist.getOptions();
 }
 
 function wrongValueFor(
@@ -368,17 +429,21 @@ describe("game store notes", () => {
   });
 });
 
-describe("game store hard mode", () => {
+describe("game store arcade mode", () => {
   beforeEach(() => {
-    useGameStore.getState().setHardModeEnabled(false);
+    useGameStore.getState().setArcadeModeEnabled(false);
     useGameStore.getState().startNewGame("easy");
   });
 
   afterEach(() => {
-    useGameStore.getState().setHardModeEnabled(false);
+    useGameStore.getState().setArcadeModeEnabled(true);
   });
 
-  it("blocks replacing a correct entered value when hard mode is off", () => {
+  it("defaults to enabled", () => {
+    expect(useGameStore.getInitialState().arcadeModeEnabled).toBe(true);
+  });
+
+  it("blocks replacing a correct entered value when arcade mode is off", () => {
     const { puzzle } = useGameStore.getState();
     const cell = findEditableCell(puzzle!.givens);
     const correctValue = valueAt(puzzle!.solution, cell) as FilledCellValue;
@@ -393,7 +458,7 @@ describe("game store hard mode", () => {
     expect(useGameStore.getState().moveHistory).toHaveLength(1);
   });
 
-  it("does not clear a correct entered value when hard mode is off", () => {
+  it("does not clear a correct entered value when arcade mode is off", () => {
     const { puzzle } = useGameStore.getState();
     const cell = findEditableCell(puzzle!.givens);
     const correctValue = valueAt(puzzle!.solution, cell) as FilledCellValue;
@@ -406,7 +471,7 @@ describe("game store hard mode", () => {
     expect(useGameStore.getState().moveHistory).toHaveLength(1);
   });
 
-  it("allows replacing a wrong value when hard mode is off", () => {
+  it("allows replacing a wrong value when arcade mode is off", () => {
     const { puzzle } = useGameStore.getState();
     const cell = findEditableCell(puzzle!.givens);
     const wrongValue = wrongValueFor(puzzle!.solution, cell);
@@ -420,27 +485,55 @@ describe("game store hard mode", () => {
     expect(useGameStore.getState().mistakes[`${cell.row}-${cell.col}`]).toBeUndefined();
   });
 
-  it("allows replacing a correct entered value when hard mode is on", () => {
+  it("blocks replacing and clearing a correct entered value when arcade mode is on", () => {
     const { puzzle } = useGameStore.getState();
     const cell = findEditableCell(puzzle!.givens);
     const correctValue = valueAt(puzzle!.solution, cell) as FilledCellValue;
     const wrongValue = wrongValueFor(puzzle!.solution, cell);
 
-    useGameStore.getState().setHardModeEnabled(true);
+    useGameStore.getState().setArcadeModeEnabled(true);
     useGameStore.getState().selectCell(cell);
     useGameStore.getState().setCellValue(correctValue);
     useGameStore.getState().setCellValue(wrongValue);
+    useGameStore.getState().clearSelectedCell();
 
-    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(wrongValue);
-    expect(useGameStore.getState().mistakes[`${cell.row}-${cell.col}`]).toBe(true);
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(correctValue);
+    expect(useGameStore.getState().mistakes[`${cell.row}-${cell.col}`]).toBeUndefined();
+    expect(useGameStore.getState().mistakeCount).toBe(0);
+    expect(useGameStore.getState().moveHistory).toHaveLength(1);
   });
 
-  it("persists hard mode", () => {
-    useGameStore.getState().setHardModeEnabled(true);
+  it("persists arcade mode through the new key", () => {
+    useGameStore.getState().setArcadeModeEnabled(false);
 
     const persistedState = partializeState();
 
-    expect(persistedState.hardModeEnabled).toBe(true);
+    expect(persistedState.arcadeModeEnabled).toBe(false);
+    expect(persistedState.hardModeEnabled).toBeUndefined();
+    expect(persistenceOptions().version).toBe(1);
+  });
+
+  it.each([false, true])(
+    "migrates legacy hard mode %s to arcade mode enabled",
+    (hardModeEnabled) => {
+      const migratedState = migrateGameStoreState(
+        { hardModeEnabled, themeMode: "light" },
+        0
+      ) as Record<string, unknown>;
+
+      expect(migratedState.arcadeModeEnabled).toBe(true);
+      expect(migratedState.hardModeEnabled).toBeUndefined();
+      expect(migratedState.themeMode).toBe("light");
+    }
+  );
+
+  it("does not override arcade preference after migration", () => {
+    const persistedState = {
+      arcadeModeEnabled: false,
+      themeMode: "light"
+    };
+
+    expect(migrateGameStoreState(persistedState, 1)).toBe(persistedState);
   });
 });
 
@@ -696,6 +789,234 @@ describe("game store selection", () => {
 
     expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(originalValue);
     expect(useGameStore.getState().moveHistory).toHaveLength(0);
+  });
+});
+
+describe("game store rapid input", () => {
+  beforeEach(() => {
+    useGameStore.getState().setArcadeModeEnabled(false);
+    useGameStore.getState().startNewGame("easy");
+  });
+
+  afterEach(() => {
+    useGameStore.getState().setArcadeModeEnabled(true);
+  });
+
+  it("enables rapid input only in arcade mode", () => {
+    useGameStore.getState().toggleRapidInputMode();
+
+    expect(useGameStore.getState().isRapidInputMode).toBe(false);
+
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+
+    expect(useGameStore.getState().isRapidInputMode).toBe(true);
+  });
+
+  it("arms a number without changing the selected cell", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+
+    useGameStore.getState().selectCell(cell);
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+    useGameStore.getState().setRapidInputValue(5);
+
+    expect(useGameStore.getState().rapidInputValue).toBe(5);
+    expect(useGameStore.getState().selectedCell).toEqual(cell);
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(0);
+  });
+
+  it("keeps an incomplete rapid number armed after a correct insertion", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+    const value = valueAt(puzzle!.solution, cell) as FilledCellValue;
+    const otherMissingCell = findOtherSolutionCell(puzzle!.solution, value, cell);
+    const userGrid = gridWithMissingNumberCells(
+      puzzle!.givens,
+      puzzle!.solution,
+      value,
+      [cell, otherMissingCell]
+    );
+
+    useGameStore.setState({ userGrid });
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+    useGameStore.getState().setRapidInputValue(value);
+    useGameStore.getState().pressCell(cell);
+
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(value);
+    expect(useGameStore.getState().rapidInputValue).toBe(value);
+    expect(useGameStore.getState().isRapidInputMode).toBe(true);
+  });
+
+  it("disarms the rapid number after its final correct occurrence", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+    const value = valueAt(puzzle!.solution, cell) as FilledCellValue;
+    const userGrid = gridWithMissingNumberCells(
+      puzzle!.givens,
+      puzzle!.solution,
+      value,
+      [cell]
+    );
+
+    useGameStore.setState({ userGrid });
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+    useGameStore.getState().setRapidInputValue(value);
+    useGameStore.getState().pressCell(cell);
+
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(value);
+    expect(useGameStore.getState().rapidInputValue).toBeNull();
+    expect(useGameStore.getState().isRapidInputMode).toBe(true);
+  });
+
+  it("does not disarm the rapid number after a wrong insertion", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+    const value = wrongValueFor(puzzle!.solution, cell);
+    const missingCell = findOtherSolutionCell(puzzle!.solution, value, cell);
+    const userGrid = gridWithMissingNumberCells(
+      puzzle!.givens,
+      puzzle!.solution,
+      value,
+      [missingCell]
+    );
+
+    useGameStore.setState({ userGrid });
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+    useGameStore.getState().setRapidInputValue(value);
+    useGameStore.getState().pressCell(cell);
+
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(value);
+    expect(useGameStore.getState().rapidInputValue).toBe(value);
+    expect(useGameStore.getState().isRapidInputMode).toBe(true);
+  });
+
+  it("only selects cells after the completed rapid number is disarmed", () => {
+    const { puzzle } = useGameStore.getState();
+    const completedCell = findEditableCell(puzzle!.givens);
+    const value = valueAt(puzzle!.solution, completedCell) as FilledCellValue;
+    const nextCell = findEditableCellWithDifferentSolutionValue(
+      puzzle!.givens,
+      puzzle!.solution,
+      value
+    );
+    const userGrid = gridWithMissingNumberCells(
+      puzzle!.givens,
+      puzzle!.solution,
+      value,
+      [completedCell]
+    );
+    const nextCellValue = valueAt(userGrid, nextCell);
+
+    useGameStore.setState({ userGrid });
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+    useGameStore.getState().setRapidInputValue(value);
+    useGameStore.getState().pressCell(completedCell);
+    useGameStore.getState().pressCell(nextCell);
+
+    expect(useGameStore.getState().rapidInputValue).toBeNull();
+    expect(useGameStore.getState().selectedCell).toEqual(nextCell);
+    expect(valueAt(useGameStore.getState().userGrid!, nextCell)).toBe(nextCellValue);
+  });
+
+  it("selects but does not change fixed or already-correct cells", () => {
+    const { puzzle } = useGameStore.getState();
+    const fixedCell = findFixedCell(puzzle!.givens);
+    const editableCell = findEditableCell(puzzle!.givens);
+    const correctValue = valueAt(puzzle!.solution, editableCell) as FilledCellValue;
+
+    useGameStore.getState().selectCell(editableCell);
+    useGameStore.getState().setCellValue(correctValue);
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+    useGameStore.getState().setRapidInputValue(
+      wrongValueFor(puzzle!.solution, editableCell)
+    );
+    useGameStore.getState().pressCell(fixedCell);
+    useGameStore.getState().pressCell(editableCell);
+
+    expect(valueAt(useGameStore.getState().userGrid!, fixedCell)).toBe(
+      valueAt(puzzle!.givens, fixedCell)
+    );
+    expect(valueAt(useGameStore.getState().userGrid!, editableCell)).toBe(correctValue);
+    expect(useGameStore.getState().selectedCell).toEqual(editableCell);
+    expect(useGameStore.getState().moveHistory).toHaveLength(1);
+  });
+
+  it("makes note mode and rapid input mutually exclusive", () => {
+    useGameStore.getState().toggleNoteMode();
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+
+    expect(useGameStore.getState().isRapidInputMode).toBe(true);
+    expect(useGameStore.getState().isNoteMode).toBe(false);
+
+    useGameStore.getState().setRapidInputValue(4);
+    useGameStore.getState().toggleNoteMode();
+
+    expect(useGameStore.getState().isNoteMode).toBe(true);
+    expect(useGameStore.getState().isRapidInputMode).toBe(false);
+    expect(useGameStore.getState().rapidInputValue).toBeNull();
+  });
+
+  it("clears cell notes when rapid input inserts a final value", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+    const value = valueAt(puzzle!.solution, cell) as FilledCellValue;
+
+    useGameStore.getState().selectCell(cell);
+    useGameStore.getState().toggleNoteMode();
+    useGameStore.getState().setCellValue(1);
+    expect(notesAt(cell)).toEqual([1]);
+
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+    useGameStore.getState().setRapidInputValue(value);
+    useGameStore.getState().pressCell(cell);
+
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(value);
+    expect(notesAt(cell)).toEqual([]);
+  });
+
+  it("undoes rapid input and restores the previous selection", () => {
+    const { puzzle } = useGameStore.getState();
+    const [firstCell, secondCell] = findTwoEditableCells(puzzle!.givens);
+    const value = valueAt(puzzle!.solution, secondCell) as FilledCellValue;
+
+    useGameStore.getState().selectCell(firstCell);
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+    useGameStore.getState().setRapidInputValue(value);
+    useGameStore.getState().pressCell(secondCell);
+    useGameStore.getState().undoLastMove();
+
+    expect(valueAt(useGameStore.getState().userGrid!, secondCell)).toBe(0);
+    expect(useGameStore.getState().selectedCell).toEqual(firstCell);
+  });
+
+  it("resets rapid input without persisting it", () => {
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+    useGameStore.getState().setRapidInputValue(7);
+
+    const persistedState = partializeState();
+    expect(persistedState.isRapidInputMode).toBeUndefined();
+    expect(persistedState.rapidInputValue).toBeUndefined();
+
+    useGameStore.getState().restartGame();
+    expect(useGameStore.getState().isRapidInputMode).toBe(false);
+    expect(useGameStore.getState().rapidInputValue).toBeNull();
+
+    useGameStore.getState().toggleRapidInputMode();
+    useGameStore.getState().setRapidInputValue(7);
+    useGameStore.getState().setArcadeModeEnabled(false);
+    expect(useGameStore.getState().isRapidInputMode).toBe(false);
+    expect(useGameStore.getState().rapidInputValue).toBeNull();
   });
 });
 
