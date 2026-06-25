@@ -13,25 +13,21 @@ const repositoryUrl = "https://github.com/HinataOuO/MinimalSudoku";
 
 const audioPresets = [
   {
-    accessibilityLabel: "Mute audio",
     label: "MUTE",
     muted: true,
     volume: 0
   },
   {
-    accessibilityLabel: "Set volume to low",
     label: "LOW",
     muted: false,
     volume: 0.1
   },
   {
-    accessibilityLabel: "Set volume to medium",
     label: "MID",
     muted: false,
     volume: 0.5
   },
   {
-    accessibilityLabel: "Set volume to high",
     label: "HIGH",
     muted: false,
     volume: 1
@@ -92,7 +88,8 @@ export default function SettingsScreen() {
 
         <AppearanceSettings />
         <GameplaySettings />
-        <AudioSettings />
+        <SoundSettings />
+        <MusicSettings />
         <DonationSettings />
         <DeveloperFooter />
       </ScrollView>
@@ -190,8 +187,48 @@ function AppearanceSettings() {
   );
 }
 
-function AudioSettings() {
+type VolumeSettingsProps = {
+  muted: boolean;
+  onSelectVolume: (volume: number, muted: boolean) => void;
+  title: string;
+  volume: number;
+};
+
+function SoundSettings() {
   const { muted, playUiClick, setVolume, volume } = useSound();
+
+  return (
+    <VolumeSettings
+      muted={muted}
+      onSelectVolume={(nextVolume, nextMuted) => {
+        setVolume(nextVolume);
+        if (!nextMuted) {
+          playUiClick();
+        }
+      }}
+      title="Sounds"
+      volume={volume}
+    />
+  );
+}
+
+function MusicSettings() {
+  const { musicMuted, musicVolume, playUiClick, setMusicVolume } = useSound();
+
+  return (
+    <VolumeSettings
+      muted={musicMuted}
+      onSelectVolume={(nextVolume) => {
+        setMusicVolume(nextVolume);
+        playUiClick();
+      }}
+      title="Music"
+      volume={musicVolume}
+    />
+  );
+}
+
+function VolumeSettings({ muted, onSelectVolume, title, volume }: VolumeSettingsProps) {
   const theme = useThemeColors();
 
   return (
@@ -203,7 +240,7 @@ function AudioSettings() {
         className="text-sm font-medium uppercase tracking-wide text-muted"
         style={{ color: theme.muted }}
       >
-        Audio
+        {title}
       </Text>
       <View
         className="h-11 flex-row overflow-hidden rounded-md border border-line bg-panelElevated"
@@ -217,15 +254,16 @@ function AudioSettings() {
           return (
             <Pressable
               key={preset.label}
-              accessibilityLabel={preset.accessibilityLabel}
+              accessibilityLabel={
+                preset.muted
+                  ? `Mute ${title.toLowerCase()}`
+                  : `Set ${title.toLowerCase()} volume to ${preset.label.toLowerCase()}`
+              }
               accessibilityRole="button"
               accessibilityState={{ selected: isSelected }}
               hitSlop={6}
               onPress={() => {
-                setVolume(preset.volume);
-                if (!preset.muted) {
-                  playUiClick();
-                }
+                onSelectVolume(preset.volume, preset.muted);
               }}
               className={`flex-1 items-center justify-center active:opacity-75 ${
                 preset.muted ? "" : "border-l"

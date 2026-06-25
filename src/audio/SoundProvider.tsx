@@ -8,24 +8,32 @@ import {
   useState,
   type ReactNode
 } from "react";
-import { useAudioPlayer, type AudioPlayer, type AudioSource } from "expo-audio";
+import { Platform } from "react-native";
+import { setAudioModeAsync, useAudioPlayer, type AudioPlayer, type AudioSource } from "expo-audio";
 
 type SoundControls = {
+  musicMuted: boolean;
+  musicVolume: number;
   muted: boolean;
   playGameOver: () => void;
   playUiClick: () => void;
   playVictory: () => void;
+  setMusicVolume: (volume: number) => void;
   setVolume: (volume: number) => void;
   toggleMuted: () => void;
   volume: number;
 };
 
 type AudioSettingsState = {
+  musicMuted: boolean;
+  musicVolume: number;
   muted: boolean;
   volume: number;
 };
 
 const defaultAudioSettings: AudioSettingsState = {
+  musicMuted: false,
+  musicVolume: 0.1,
   muted: false,
   volume: 1
 };
@@ -33,10 +41,13 @@ const defaultAudioSettings: AudioSettingsState = {
 const audioPresetVolumes = [0, 0.1, 0.5, 1] as const;
 
 const SoundContext = createContext<SoundControls>({
+  musicMuted: defaultAudioSettings.musicMuted,
+  musicVolume: defaultAudioSettings.musicVolume,
   muted: defaultAudioSettings.muted,
   playGameOver: () => undefined,
   playUiClick: () => undefined,
   playVictory: () => undefined,
+  setMusicVolume: () => undefined,
   setVolume: () => undefined,
   toggleMuted: () => undefined,
   volume: defaultAudioSettings.volume
@@ -52,20 +63,50 @@ function isPresetVolume(volume: number) {
   return audioPresetVolumes.some((presetVolume) => Math.abs(volume - presetVolume) < 0.01);
 }
 
-function normalizeAudioSettings(settings: Partial<AudioSettingsState>) {
-  if (typeof settings.volume !== "number") {
-    return defaultAudioSettings;
+function normalizeVolumeSettings(
+  volume: unknown,
+  muted: unknown,
+  defaultVolume: number
+) {
+  if (typeof volume !== "number") {
+    return {
+      muted: false,
+      volume: defaultVolume
+    };
   }
 
-  const volume = clampVolume(settings.volume);
+  const normalizedVolume = clampVolume(volume);
 
-  if (!isPresetVolume(volume)) {
-    return defaultAudioSettings;
+  if (!isPresetVolume(normalizedVolume)) {
+    return {
+      muted: false,
+      volume: defaultVolume
+    };
   }
 
   return {
-    muted: volume === 0 || settings.muted === true,
-    volume
+    muted: normalizedVolume === 0 || muted === true,
+    volume: normalizedVolume
+  };
+}
+
+function normalizeAudioSettings(settings: Partial<AudioSettingsState>) {
+  const sounds = normalizeVolumeSettings(
+    settings.volume,
+    settings.muted,
+    defaultAudioSettings.volume
+  );
+  const music = normalizeVolumeSettings(
+    settings.musicVolume,
+    settings.musicMuted,
+    defaultAudioSettings.musicVolume
+  );
+
+  return {
+    musicMuted: music.muted,
+    musicVolume: music.volume,
+    muted: sounds.muted,
+    volume: sounds.volume
   };
 }
 
@@ -80,6 +121,21 @@ function applyAudioSettingsToPlayer(player: AudioPlayer, settings: AudioSettings
   player.volume = settings.volume;
 }
 
+function applyMusicSettingsToPlayer(player: AudioPlayer, settings: AudioSettingsState) {
+  player.loop = true;
+
+  if (settings.musicMuted || settings.musicVolume === 0) {
+    player.muted = true;
+    player.volume = 0;
+    player.pause();
+    return;
+  }
+
+  player.muted = false;
+  player.volume = settings.musicVolume;
+  player.play();
+}
+
 function playFromStart(player: AudioPlayer) {
   void player
     .seekTo(0)
@@ -91,15 +147,39 @@ function playFromStart(player: AudioPlayer) {
 
 const clickSound = require("../../assets/audio/click.mp3") as AudioSource;
 const gameOverSound = require("../../assets/audio/lose.mp3") as AudioSource;
+const musicSound = require("../../assets/audio/loop.mp3") as AudioSource;
 const victorySound = require("../../assets/audio/win.mp3") as AudioSource;
 
 export function SoundProvider({ children }: { children: ReactNode }) {
   const clickPlayer = useAudioPlayer(clickSound);
   const gameOverPlayer = useAudioPlayer(gameOverSound);
+  const musicPlayer = useAudioPlayer(musicSound);
   const victoryPlayer = useAudioPlayer(victorySound);
+  const [musicVolume, setMusicVolumeState] = useState(defaultAudioSettings.musicVolume);
+  const [musicMuted, setMusicMuted] = useState(defaultAudioSettings.musicMuted);
   const [volume, setVolumeState] = useState(defaultAudioSettings.volume);
   const [muted, setMuted] = useState(defaultAudioSettings.muted);
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
   const settingsRef = useRef<AudioSettingsState>(defaultAudioSettings);
+  const settingsChangedDuringHydrationRef = useRef(false);
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") {
+      return;
+    }
+
+    void setAudioModeAsync({
+      allowsRecording: false,
+      interruptionMode: "mixWithOthers",
+      interruptionModeAndroid: "doNotMix",
+      shouldPlayInBackground: false,
+      shouldRouteThroughEarpiece: false
+    }).catch((error) => {
+      if (__DEV__) {
+        console.warn("Unable to configure audio mode", error);
+      }
+    });
+  }, []);
   const isPersistingSettingsRef = useRef(false);
   const pendingSettingsRef = useRef<AudioSettingsState | null>(null);
 
@@ -110,6 +190,13 @@ export function SoundProvider({ children }: { children: ReactNode }) {
       applyAudioSettingsToPlayer(victoryPlayer, nextSettings);
     },
     [clickPlayer, gameOverPlayer, victoryPlayer]
+  );
+
+  const applyMusicSettings = useCallback(
+    (nextSettings: AudioSettingsState) => {
+      applyMusicSettingsToPlayer(musicPlayer, nextSettings);
+    },
+    [musicPlayer]
   );
 
   const persistQueuedAudioSettings = useCallback((nextSettings: AudioSettingsState) => {
@@ -146,23 +233,30 @@ export function SoundProvider({ children }: { children: ReactNode }) {
 
     void AsyncStorage.getItem(audioSettingsStorageKey)
       .then((storedSettings) => {
-        if (!storedSettings || !isMounted) {
+        if (!isMounted) {
           return;
         }
 
-        const parsedSettings = JSON.parse(storedSettings) as Partial<{
-          muted: boolean;
-          volume: number;
-        }>;
+        if (settingsChangedDuringHydrationRef.current) {
+          return;
+        }
 
-        const loadedSettings = normalizeAudioSettings(parsedSettings);
+        const loadedSettings = storedSettings
+          ? normalizeAudioSettings(JSON.parse(storedSettings) as Partial<AudioSettingsState>)
+          : defaultAudioSettings;
 
         settingsRef.current = loadedSettings;
+        setMusicVolumeState(loadedSettings.musicVolume);
+        setMusicMuted(loadedSettings.musicMuted);
         setVolumeState(loadedSettings.volume);
         setMuted(loadedSettings.muted);
       })
       .catch(() => undefined)
-      .finally(() => undefined);
+      .finally(() => {
+        if (isMounted) {
+          setSettingsHydrated(true);
+        }
+      });
 
     return () => {
       isMounted = false;
@@ -170,8 +264,21 @@ export function SoundProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!settingsHydrated) {
+      return;
+    }
+
     applyAudioSettings(settingsRef.current);
-  }, [applyAudioSettings, muted, volume]);
+    applyMusicSettings(settingsRef.current);
+  }, [
+    applyAudioSettings,
+    applyMusicSettings,
+    musicMuted,
+    musicVolume,
+    muted,
+    settingsHydrated,
+    volume
+  ]);
 
   const playUiClick = useCallback(() => {
     playFromStart(clickPlayer);
@@ -186,11 +293,18 @@ export function SoundProvider({ children }: { children: ReactNode }) {
   }, [victoryPlayer]);
 
   const setVolume = useCallback((nextVolume: number) => {
+    settingsChangedDuringHydrationRef.current = true;
     const clampedVolume = clampVolume(nextVolume);
-    const nextSettings = normalizeAudioSettings({
-      muted: clampedVolume === 0,
-      volume: clampedVolume
-    });
+    const normalizedSounds = normalizeVolumeSettings(
+      clampedVolume,
+      clampedVolume === 0,
+      defaultAudioSettings.volume
+    );
+    const nextSettings = {
+      ...settingsRef.current,
+      muted: normalizedSounds.muted,
+      volume: normalizedSounds.volume
+    };
 
     settingsRef.current = nextSettings;
     applyAudioSettings(nextSettings);
@@ -199,15 +313,42 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     queuePersistAudioSettings(nextSettings);
   }, [applyAudioSettings, queuePersistAudioSettings]);
 
+  const setMusicVolume = useCallback((nextVolume: number) => {
+    settingsChangedDuringHydrationRef.current = true;
+    const clampedVolume = clampVolume(nextVolume);
+    const normalizedMusic = normalizeVolumeSettings(
+      clampedVolume,
+      clampedVolume === 0,
+      defaultAudioSettings.musicVolume
+    );
+    const nextSettings = {
+      ...settingsRef.current,
+      musicMuted: normalizedMusic.muted,
+      musicVolume: normalizedMusic.volume
+    };
+
+    settingsRef.current = nextSettings;
+    applyMusicSettings(nextSettings);
+    setMusicVolumeState(nextSettings.musicVolume);
+    setMusicMuted(nextSettings.musicMuted);
+    queuePersistAudioSettings(nextSettings);
+  }, [applyMusicSettings, queuePersistAudioSettings]);
+
   const toggleMuted = useCallback(() => {
+    settingsChangedDuringHydrationRef.current = true;
     const nextMuted = !settingsRef.current.muted;
-    const nextSettings = normalizeAudioSettings({
-      muted: nextMuted,
-      volume:
-        !nextMuted && settingsRef.current.volume === 0
-          ? defaultAudioSettings.volume
-          : settingsRef.current.volume
-    });
+    const normalizedSounds = normalizeVolumeSettings(
+      !nextMuted && settingsRef.current.volume === 0
+        ? defaultAudioSettings.volume
+        : settingsRef.current.volume,
+      nextMuted,
+      defaultAudioSettings.volume
+    );
+    const nextSettings = {
+      ...settingsRef.current,
+      muted: normalizedSounds.muted,
+      volume: normalizedSounds.volume
+    };
 
     settingsRef.current = nextSettings;
     applyAudioSettings(nextSettings);
@@ -217,7 +358,18 @@ export function SoundProvider({ children }: { children: ReactNode }) {
 
   return (
     <SoundContext.Provider
-      value={{ muted, playGameOver, playUiClick, playVictory, setVolume, toggleMuted, volume }}
+      value={{
+        musicMuted,
+        musicVolume,
+        muted,
+        playGameOver,
+        playUiClick,
+        playVictory,
+        setMusicVolume,
+        setVolume,
+        toggleMuted,
+        volume
+      }}
     >
       {children}
     </SoundContext.Provider>

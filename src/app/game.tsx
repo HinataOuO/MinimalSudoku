@@ -269,7 +269,7 @@ export default function GameScreen() {
         </View>
         <View className="ml-auto flex-row items-center gap-2">
           <Pressable
-            accessibilityLabel="Condividi partita"
+            accessibilityLabel="Share game"
             accessibilityRole="button"
             hitSlop={8}
             onPress={() => {
@@ -347,38 +347,22 @@ export default function GameScreen() {
           className="flex-1 bg-canvas px-7 py-6"
           style={{ backgroundColor: theme.canvas }}
         >
-          <View className="flex-row items-center justify-between">
+          <View className="items-center">
             <Text
               accessibilityRole="header"
               className="text-2xl font-medium text-ink"
               style={{ color: theme.ink }}
             >
-              Condividi partita
+              Share game
             </Text>
-            <Pressable
-              accessibilityLabel="Chiudi condivisione"
-              accessibilityRole="button"
-              hitSlop={8}
-              onPress={() => {
-                playUiClick();
-                closeShare();
-              }}
-              className="h-10 w-10 items-center justify-center rounded-md border border-line active:opacity-75"
-              style={{ borderColor: theme.line }}
-            >
-              <X color={theme.muted} size={22} strokeWidth={1.8} absoluteStrokeWidth />
-            </Pressable>
           </View>
 
-          <View className="flex-1 items-center justify-center gap-6">
-            <View
-              className="items-center justify-center rounded-xl bg-white p-5"
-              style={{ backgroundColor: "#FFFFFF" }}
-            >
+          <View className="flex-1 items-center justify-center gap-6 pb-10">
+            <View className="items-center justify-center">
               {sharedGameUrl ? (
                 <QRCode
-                  backgroundColor="#FFFFFF"
-                  color="#111111"
+                  backgroundColor={theme.canvas}
+                  color={theme.ink}
                   size={Math.min(width - 96, 320)}
                   value={sharedGameUrl}
                 />
@@ -389,18 +373,35 @@ export default function GameScreen() {
                 className="text-center text-lg font-medium text-ink"
                 style={{ color: theme.ink }}
               >
-                Scansiona con la fotocamera
+                Scan with your camera
               </Text>
               <Text
                 className="text-center text-sm leading-5 text-muted"
                 style={{ color: theme.muted }}
               >
-                Il link apre una nuova partita con stessa griglia, difficoltà e modalità Arcade.
+                The link opens a new game with the same grid, difficulty, and Arcade mode.
               </Text>
             </View>
+            <Pressable
+              accessibilityLabel="Exit sharing"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => {
+                playUiClick();
+                closeShare();
+              }}
+              className="flex-row items-center justify-center gap-2 rounded-md border border-line px-5 py-3 active:opacity-75"
+              style={{ borderColor: theme.line }}
+            >
+              <X color={theme.muted} size={20} strokeWidth={1.8} absoluteStrokeWidth />
+              <Text
+                className="text-base font-medium tracking-wide text-muted"
+                style={{ color: theme.muted }}
+              >
+                EXIT
+              </Text>
+            </Pressable>
           </View>
-
-          <Button label="Chiudi" onPress={closeShare} variant="secondary" />
         </SafeAreaView>
       </Modal>
     </SafeAreaView>

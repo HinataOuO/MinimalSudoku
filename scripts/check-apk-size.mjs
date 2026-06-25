@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 const apkPath = fileURLToPath(
   new URL("../android/app/build/outputs/apk/release/app-release.apk", import.meta.url),
 );
-const maxSizeMB = 20;
+const maxSizeMB = 12.3;
 const maxSizeBytes = maxSizeMB * 1_000_000;
 
 let apkSizeBytes;

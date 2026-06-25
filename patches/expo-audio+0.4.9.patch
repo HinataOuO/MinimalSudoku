@@ -1,0 +1,74 @@
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioModule.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioModule.kt
+index c9fd366..6d8fa2b 100644
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioModule.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioModule.kt
+@@ -5,6 +5,5 @@
+ import android.content.Context
+ import android.content.pm.PackageManager
+-import android.media.AudioAttributes
+ import android.media.AudioFocusRequest
+ import android.media.AudioManager
+ import android.net.Uri
+@@ -54,7 +53,7 @@ class AudioModule : Module() {
+   private var audioEnabled = true
+   private var shouldRouteThroughEarpiece = false
+   private var focusAcquired = false
+-  private var interruptionMode: InterruptionMode? = null
++  private var interruptionMode: InterruptionMode? = InterruptionMode.MIX_WITH_OTHERS
+ 
+   private var audioFocusRequest: AudioFocusRequest? = null
+   private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+@@ -114,41 +113,6 @@ class AudioModule : Module() {
+   }
+ 
+   private fun requestAudioFocus() {
+-    if (focusAcquired || !audioEnabled) {
+-      return
+-    }
+-
+-    val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+-      val requestType = interruptionMode?.let {
+-        if (it == InterruptionMode.DO_NOT_MIX) {
+-          AudioManager.AUDIOFOCUS_GAIN
+-        } else {
+-          AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+-        }
+-      } ?: AudioManager.AUDIOFOCUS_GAIN
+-      audioFocusRequest = AudioFocusRequest.Builder(requestType).run {
+-        setAudioAttributes(
+-          AudioAttributes.Builder()
+-            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+-            .build()
+-        )
+-        setAcceptsDelayedFocusGain(true)
+-        setOnAudioFocusChangeListener(audioFocusChangeListener)
+-        build()
+-      }
+-      audioFocusRequest?.let {
+-        audioManager.requestAudioFocus(it)
+-      }
+-    } else {
+-      @Suppress("DEPRECATION")
+-      audioManager.requestAudioFocus(audioFocusChangeListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+-    }
+-
+-    if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+-      focusAcquired = true
+-    } else {
+-      Log.e(TAG, "Audio focus request failed with: $result")
+-    }
+   }
+ 
+   private fun releaseAudioFocus() {
+diff --git a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioRecords.kt b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioRecords.kt
+index 1d863e0..58e516b 100644
+--- a/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioRecords.kt
++++ b/node_modules/expo-audio/android/src/main/java/expo/modules/audio/AudioRecords.kt
+@@ -78,6 +78,7 @@ enum class AndroidAudioEncoder(val value: String) : Enumerable {
+ }
+ 
+ enum class InterruptionMode(val value: String) : Enumerable {
++  MIX_WITH_OTHERS("mixWithOthers"),
+   DO_NOT_MIX("doNotMix"),
+   DUCK_OTHERS("duckOthers")
+ }

@@ -18,7 +18,7 @@ jest.mock("expo-router", () => {
     }
   };
 });
-jest.mock("react-native-qrcode-svg", () => () => null);
+jest.mock("react-native-qrcode-svg", () => jest.fn(() => null));
 jest.mock("@/components/NumberPad", () => ({ NumberPad: () => null }));
 jest.mock("@/components/SudokuGrid", () => ({ SudokuGrid: () => null }));
 jest.mock("@/audio/SoundProvider", () => ({
@@ -31,6 +31,7 @@ jest.mock("@/audio/SoundProvider", () => ({
 
 import React from "react";
 import { fireEvent, render } from "@testing-library/react-native";
+import QRCode from "react-native-qrcode-svg";
 
 import GameScreen from "@/app/game";
 import { useGameStore } from "@/store/gameStore";
@@ -48,13 +49,25 @@ describe("game sharing overlay", () => {
     const screen = render(React.createElement(GameScreen));
 
     jest.spyOn(Date, "now").mockReturnValue(6_000);
-    fireEvent.press(screen.getByLabelText("Condividi partita"));
+    fireEvent.press(screen.getByLabelText("Share game"));
 
     expect(useGameStore.getState().startedAt).toBeNull();
     expect(useGameStore.getState().elapsedMs).toBe(5_000);
+    expect(screen.getByText("Share game")).toBeTruthy();
+    expect(screen.getByText("Scan with your camera")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The link opens a new game with the same grid, difficulty, and Arcade mode."
+      )
+    ).toBeTruthy();
+    expect(screen.getByText("EXIT")).toBeTruthy();
+    expect((QRCode as jest.Mock).mock.calls[0][0]).toMatchObject({
+      backgroundColor: "#0A0A0A",
+      color: "#F2F2F2"
+    });
 
     jest.spyOn(Date, "now").mockReturnValue(20_000);
-    fireEvent.press(screen.getByLabelText("Chiudi condivisione"));
+    fireEvent.press(screen.getByLabelText("Exit sharing"));
 
     expect(useGameStore.getState().startedAt).toBe(20_000);
     expect(useGameStore.getState().elapsedMs).toBe(5_000);

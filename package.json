@@ -8,7 +8,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "apk:demo": "cd android && NODE_ENV=production ./gradlew assembleRelease --no-daemon --max-workers=2 && cd .. && node scripts/check-apk-size.mjs",
+    "apk:demo": "cd android && NODE_ENV=production ./gradlew clean assembleRelease --no-daemon --max-workers=2 -PreactNativeArchitectures=arm64-v8a -PnewArchEnabled=true -PhermesEnabled=true -Pandroid.enableBundleCompression=true -Pandroid.enableProguardInReleaseBuilds=true -Pandroid.enableShrinkResourcesInReleaseBuilds=true -Pexpo.useLegacyPackaging=true && cd .. && node scripts/check-apk-size.mjs",
+    "postinstall": "patch-package",
     "typecheck": "tsc --noEmit",
     "test": "jest --cacheDirectory ./.jest-cache"
   },
@@ -39,6 +40,7 @@
     "@types/react": "~19.0.10",
     "jest": "^29.7.0",
     "jest-expo": "~53.0.0",
+    "patch-package": "^8.0.1",
     "react-test-renderer": "19.0.0",
     "typescript": "~5.8.3"
   },
