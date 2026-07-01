@@ -8,6 +8,7 @@ import {
   SudokuGrid,
   Technique
 } from "./types";
+import { ALL_VALUES_MASK, boxIndex, candidateMask, maskSize, valueBit } from "./masks";
 import { cloneGrid, isValidGridShape } from "./validator";
 
 type UnitType = "row" | "col" | "box";
@@ -30,7 +31,6 @@ type RatingState = {
 };
 
 const values: FilledCellValue[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-const ALL_VALUES_MASK = 0b1111111110;
 
 const techniqueRank: Record<Technique, number> = {
   nakedSingle: 1,
@@ -51,26 +51,6 @@ const techniqueScore: Record<Technique, number> = {
 const units = buildUnits();
 const lineUnits = units.filter((unit) => unit.type === "row" || unit.type === "col");
 const boxUnits = units.filter((unit) => unit.type === "box");
-
-function boxIndex(row: number, col: number): number {
-  return Math.floor(row / BOX_SIZE) * BOX_SIZE + Math.floor(col / BOX_SIZE);
-}
-
-function valueBit(value: number): number {
-  return 1 << value;
-}
-
-function maskSize(mask: number): number {
-  let size = 0;
-  let remaining = mask;
-
-  while (remaining) {
-    remaining &= remaining - 1;
-    size += 1;
-  }
-
-  return size;
-}
 
 function firstValue(mask: number): FilledCellValue {
   for (const value of values) {
@@ -152,8 +132,7 @@ function buildRatingState(grid: SudokuGrid): RatingState | null {
         continue;
       }
 
-      candidates[row][col] =
-        ALL_VALUES_MASK & ~(rowMasks[row] | colMasks[col] | boxMasks[boxIndex(row, col)]);
+      candidates[row][col] = candidateMask(rowMasks, colMasks, boxMasks, row, col);
     }
   }
 

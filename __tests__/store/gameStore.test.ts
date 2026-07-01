@@ -985,28 +985,46 @@ describe("game store rapid input", () => {
     expect(valueAt(useGameStore.getState().userGrid!, nextCell)).toBe(nextCellValue);
   });
 
-  it("selects but does not change fixed or already-correct cells", () => {
+  it("does not select or change filled cells while rapid input is armed", () => {
     const { puzzle } = useGameStore.getState();
     const fixedCell = findFixedCell(puzzle!.givens);
-    const editableCell = findEditableCell(puzzle!.givens);
-    const correctValue = valueAt(puzzle!.solution, editableCell) as FilledCellValue;
+    const [alreadyCorrectCell, emptyCell] = findTwoEditableCells(puzzle!.givens);
+    const previousCell = findEditableCellWithDifferentSolutionValue(
+      puzzle!.givens,
+      puzzle!.solution,
+      valueAt(puzzle!.solution, alreadyCorrectCell) as FilledCellValue
+    );
+    const correctValue = valueAt(
+      puzzle!.solution,
+      alreadyCorrectCell
+    ) as FilledCellValue;
+    const emptyValue = valueAt(puzzle!.solution, emptyCell) as FilledCellValue;
 
-    useGameStore.getState().selectCell(editableCell);
+    useGameStore.getState().selectCell(alreadyCorrectCell);
     useGameStore.getState().setCellValue(correctValue);
+    useGameStore.getState().selectCell(previousCell);
     useGameStore.getState().setArcadeModeEnabled(true);
     useGameStore.getState().toggleRapidInputMode();
-    useGameStore.getState().setRapidInputValue(
-      wrongValueFor(puzzle!.solution, editableCell)
-    );
+    useGameStore.getState().setRapidInputValue(emptyValue);
     useGameStore.getState().pressCell(fixedCell);
-    useGameStore.getState().pressCell(editableCell);
 
     expect(valueAt(useGameStore.getState().userGrid!, fixedCell)).toBe(
       valueAt(puzzle!.givens, fixedCell)
     );
-    expect(valueAt(useGameStore.getState().userGrid!, editableCell)).toBe(correctValue);
-    expect(useGameStore.getState().selectedCell).toEqual(editableCell);
-    expect(useGameStore.getState().moveHistory).toHaveLength(1);
+    expect(useGameStore.getState().selectedCell).toEqual(previousCell);
+
+    useGameStore.getState().pressCell(alreadyCorrectCell);
+
+    expect(valueAt(useGameStore.getState().userGrid!, alreadyCorrectCell)).toBe(
+      correctValue
+    );
+    expect(useGameStore.getState().selectedCell).toEqual(previousCell);
+
+    useGameStore.getState().pressCell(emptyCell);
+
+    expect(valueAt(useGameStore.getState().userGrid!, emptyCell)).toBe(emptyValue);
+    expect(useGameStore.getState().selectedCell).toEqual(emptyCell);
+    expect(useGameStore.getState().moveHistory).toHaveLength(2);
   });
 
   it("makes note mode and rapid input mutually exclusive", () => {

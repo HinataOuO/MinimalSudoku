@@ -528,17 +528,24 @@ export const useGameStore = create<GameState>()(
           isRapidInputMode,
           rapidInputValue,
           selectedCell,
-          status
+          status,
+          userGrid
         } = get();
         if (status !== "playing") {
           return;
         }
 
-        set({ selectedCell: cell });
-
         if (arcadeModeEnabled && isRapidInputMode && rapidInputValue !== null) {
+          if (userGrid?.[cell.row][cell.col] !== 0) {
+            return;
+          }
+
+          set({ selectedCell: cell });
           applyCellValue(cell, rapidInputValue, false, selectedCell);
+          return;
         }
+
+        set({ selectedCell: cell });
       },
 
       setCellValue: (value) => {

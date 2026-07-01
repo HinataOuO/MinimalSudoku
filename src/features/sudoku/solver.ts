@@ -1,3 +1,4 @@
+import { boxIndex, candidateMask, maskSize, valueBit } from "./masks";
 import { cloneGrid, isValidGridShape } from "./validator";
 import { EMPTY_CELL, FilledCellValue, GRID_SIZE, SudokuGrid } from "./types";
 
@@ -6,28 +7,6 @@ type EmptyCell = {
   col: number;
   candidates: number;
 };
-
-const ALL_VALUES_MASK = 0b1111111110;
-
-function boxIndex(row: number, col: number): number {
-  return Math.floor(row / 3) * 3 + Math.floor(col / 3);
-}
-
-function valueBit(value: number): number {
-  return 1 << value;
-}
-
-function maskSize(mask: number): number {
-  let size = 0;
-  let remaining = mask;
-
-  while (remaining) {
-    remaining &= remaining - 1;
-    size += 1;
-  }
-
-  return size;
-}
 
 function valuesFromMask(mask: number, randomize: boolean): FilledCellValue[] {
   const values: FilledCellValue[] = [];
@@ -89,7 +68,7 @@ function findBestEmptyCell(
         continue;
       }
 
-      const candidates = ALL_VALUES_MASK & ~(rowMasks[row] | colMasks[col] | boxMasks[boxIndex(row, col)]);
+      const candidates = candidateMask(rowMasks, colMasks, boxMasks, row, col);
       const candidateCount = maskSize(candidates);
 
       if (!best || candidateCount < bestSize) {

@@ -32,6 +32,18 @@ const advancedPuzzle: SudokuGrid = [
   [0, 0, 7, 0, 0, 0, 3, 0, 0]
 ];
 
+const invalidPuzzle: SudokuGrid = [
+  [5, 5, 0, 0, 7, 0, 0, 0, 0],
+  [6, 0, 0, 1, 9, 5, 0, 0, 0],
+  [0, 9, 8, 0, 0, 0, 0, 6, 0],
+  [8, 0, 0, 0, 6, 0, 0, 0, 3],
+  [4, 0, 0, 8, 0, 3, 0, 0, 1],
+  [7, 0, 0, 0, 2, 0, 0, 0, 6],
+  [0, 6, 0, 0, 0, 0, 2, 8, 0],
+  [0, 0, 0, 4, 1, 9, 0, 0, 5],
+  [0, 0, 0, 0, 8, 0, 0, 7, 9]
+];
+
 function countClues(grid: SudokuGrid): number {
   return grid.reduce((total, row) => total + row.filter((cell) => cell !== 0).length, 0);
 }
@@ -47,6 +59,17 @@ describe("sudoku solver", () => {
   it("detects unique solution", () => {
     expect(hasUniqueSolution(puzzle)).toBe(true);
     expect(countSolutions(puzzle, 2)).toBe(1);
+  });
+
+  it("rejects invalid grids", () => {
+    expect(solveSudoku(invalidPuzzle)).toBeNull();
+    expect(countSolutions(invalidPuzzle)).toBe(0);
+    expect(ratePuzzle(invalidPuzzle)).toEqual({
+      solved: false,
+      score: 0,
+      maxTechnique: null,
+      steps: []
+    });
   });
 
   it("generates uniquely solvable puzzles", () => {
