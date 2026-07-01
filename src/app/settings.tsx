@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useSound } from "@/audio/SoundProvider";
 import { Button } from "@/components/Button";
+import { SpotifyModeButton } from "@/components/SpotifyModeButton";
 import { useGameStore } from "@/store/gameStore";
 import { useThemeColors } from "@/theme/colors";
 
@@ -45,7 +46,7 @@ export default function SettingsScreen() {
     >
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View className="h-11 justify-center">
+      <View className="h-11 flex-row items-center justify-between">
         <Pressable
           accessibilityLabel="Back home"
           accessibilityRole="button"
@@ -59,6 +60,7 @@ export default function SettingsScreen() {
         >
           <Home color={theme.muted} size={20} strokeWidth={1.8} absoluteStrokeWidth />
         </Pressable>
+        <SpotifyModeButton />
       </View>
 
       <ScrollView

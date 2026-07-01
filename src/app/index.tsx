@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSound } from "@/audio/SoundProvider";
 import { Button } from "@/components/Button";
 import { LoadingScreen } from "@/components/LoadingScreen";
+import { SpotifyModeButton } from "@/components/SpotifyModeButton";
 import { useGameStore } from "@/store/gameStore";
 import { useThemeColors } from "@/theme/colors";
 
@@ -25,22 +26,25 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-canvas px-7" style={{ backgroundColor: theme.canvas }}>
+    <SafeAreaView className="flex-1 bg-canvas px-7 pt-4" style={{ backgroundColor: theme.canvas }}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <Pressable
-        accessibilityLabel="Open settings"
-        accessibilityRole="button"
-        hitSlop={8}
-        onPress={() => {
-          playUiClick();
-          router.push("/settings" as Href);
-        }}
-        className="absolute left-7 top-[88px] z-10 h-10 w-10 items-center justify-center rounded-md border border-line bg-transparent active:opacity-75"
-        style={{ borderColor: theme.line }}
-      >
-        <Settings color={theme.muted} size={20} strokeWidth={1.8} absoluteStrokeWidth />
-      </Pressable>
+      <View className="h-11 flex-row items-center justify-between">
+        <Pressable
+          accessibilityLabel="Open settings"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => {
+            playUiClick();
+            router.push("/settings" as Href);
+          }}
+          className="h-10 w-10 items-center justify-center rounded-md border border-line bg-transparent active:opacity-75"
+          style={{ borderColor: theme.line }}
+        >
+          <Settings color={theme.muted} size={20} strokeWidth={1.8} absoluteStrokeWidth />
+        </Pressable>
+        <SpotifyModeButton />
+      </View>
 
       <View className="flex-1 justify-center gap-10">
         <View className="items-center gap-4">

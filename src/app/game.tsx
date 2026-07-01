@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { router, Stack, useFocusEffect } from "expo-router";
-import { Clock3, Home, RotateCcw, Share2, X } from "lucide-react-native";
+import { Clock3, Home, LogOut, RotateCcw, Share2 } from "lucide-react-native";
 import { AppState, Modal, Pressable, Text, useWindowDimensions, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -9,6 +9,7 @@ import { useSound } from "@/audio/SoundProvider";
 import { Button } from "@/components/Button";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { NumberPad } from "@/components/NumberPad";
+import { SpotifyModeButton } from "@/components/SpotifyModeButton";
 import { SudokuGrid } from "@/components/SudokuGrid";
 import {
   buildSharedGameUrl,
@@ -268,6 +269,7 @@ export default function GameScreen() {
           </Text>
         </View>
         <View className="ml-auto flex-row items-center gap-2">
+          <SpotifyModeButton />
           <Pressable
             accessibilityLabel="Share game"
             accessibilityRole="button"
@@ -316,7 +318,7 @@ export default function GameScreen() {
             className="text-xs font-medium uppercase tracking-wide text-muted"
             style={{ color: theme.muted }}
           >
-            Errori {mistakeCount}/3
+            MISS {mistakeCount}/3
           </Text>
           <View
             className="mt-2 flex-row items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5"
@@ -382,25 +384,13 @@ export default function GameScreen() {
                 The link opens a new game with the same grid, difficulty, and Arcade mode.
               </Text>
             </View>
-            <Pressable
+            <Button
               accessibilityLabel="Exit sharing"
-              accessibilityRole="button"
-              hitSlop={8}
-              onPress={() => {
-                playUiClick();
-                closeShare();
-              }}
-              className="flex-row items-center justify-center gap-2 rounded-md border border-line px-5 py-3 active:opacity-75"
-              style={{ borderColor: theme.line }}
-            >
-              <X color={theme.muted} size={20} strokeWidth={1.8} absoluteStrokeWidth />
-              <Text
-                className="text-base font-medium tracking-wide text-muted"
-                style={{ color: theme.muted }}
-              >
-                EXIT
-              </Text>
-            </Pressable>
+              icon={<LogOut color={theme.ink} size={20} strokeWidth={1.9} absoluteStrokeWidth />}
+              label="EXIT"
+              onPress={closeShare}
+              variant="secondary"
+            />
           </View>
         </SafeAreaView>
       </Modal>

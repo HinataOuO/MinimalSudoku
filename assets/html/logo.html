@@ -1,0 +1,86 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@900&display=swap');
+
+  .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 220px;
+    background: #f5f3ff;
+    border-radius: 12px;
+  }
+
+  .ouo-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .ouo-text {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 900;
+    font-size: 110px;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    display: inline-block;
+    position: relative;
+    color: #000;
+    -webkit-text-fill-color: #000;
+  }
+
+  /* metallic sweep */
+  .ouo-text::before {
+    content: 'OuO';
+    position: absolute;
+    inset: 0;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    background: linear-gradient(
+      105deg,
+      transparent    0%,
+      transparent   30%,
+      rgba(255,255,255,0.08) 38%,
+      rgba(255,255,255,0.82) 48%,
+      rgba(255,255,255,0.95) 50%,
+      rgba(255,255,255,0.82) 52%,
+      rgba(255,255,255,0.08) 60%,
+      transparent   68%,
+      transparent  100%
+    );
+    background-size: 300% 100%;
+    background-position: 150% 0;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: metal-sweep 5s ease-in-out infinite;
+  }
+
+  .ouo-reflect-line {
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      #00000033 15%,
+      #000000aa 40%,
+      #000000aa 60%,
+      #00000033 85%,
+      transparent 100%
+    );
+    margin-top: 4px;
+  }
+
+  @keyframes metal-sweep {
+    0%        { background-position: 150% 0; }
+    55%, 100% { background-position: -50% 0; }
+  }
+</style>
+
+<div class="wrap" role="img" aria-label="OuO testo nero effetto metallico con riflesso linea">
+  <div class="ouo-stack">
+    <span class="ouo-text">OuO</span>
+    <div class="ouo-reflect-line"></div>
+  </div>
+</div>
