@@ -1,4 +1,4 @@
-package com.anonymous.minimalsudoku
+package io.github.hinaouo.minimalsudoku
 
 import android.os.Build
 import android.os.Bundle

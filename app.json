@@ -20,7 +20,7 @@
         "monochromeImage": "./assets/img/adaptive-icon-monochrome.png",
         "backgroundColor": "#ffcc19"
       },
-      "package": "com.anonymous.minimalsudoku"
+      "package": "io.github.hinaouo.minimalsudoku"
     },
     "plugins": [
       "expo-router",

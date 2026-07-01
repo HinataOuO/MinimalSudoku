@@ -26,7 +26,7 @@ layers:
 - [x] `03-store-state.md` - stato app, persistenza e flussi dati.
 - [x] `04-ui-render.md` - rendering UI e performance interazione.
 - [x] `05-audio-assets.md` - audio, asset e peso bundle.
-- [ ] `06-dependencies.md` - dipendenze e superficie runtime.
+- [x] `06-dependencies.md` - dipendenze e superficie runtime.
 - [ ] `07-android-release.md` - configurazione release Android/Play Store.
 - [ ] `08-verification.md` - verifica finale e regressioni.
 

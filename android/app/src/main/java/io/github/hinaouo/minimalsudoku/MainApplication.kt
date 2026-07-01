@@ -1,4 +1,4 @@
-package com.anonymous.minimalsudoku
+package io.github.hinaouo.minimalsudoku
 
 import android.app.Application
 import android.content.res.Configuration

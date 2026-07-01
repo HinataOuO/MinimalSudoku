@@ -80,6 +80,14 @@ def enableProguardInReleaseBuilds = (findProperty('android.enableProguardInRelea
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+def isReleaseBuild = gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
+def releaseSigningEnv = { name ->
+    def value = System.getenv(name)
+    if (!value && isReleaseBuild) {
+        throw new GradleException("Missing ${name} for release signing")
+    }
+    return value
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -87,9 +95,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.anonymous.minimalsudoku'
+    namespace 'io.github.hinaouo.minimalsudoku'
     defaultConfig {
-        applicationId 'com.anonymous.minimalsudoku'
+        applicationId 'io.github.hinaouo.minimalsudoku'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -102,15 +110,22 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            def uploadStoreFile = releaseSigningEnv("MINIMAL_SUDOKU_UPLOAD_STORE_FILE")
+            if (uploadStoreFile) {
+                storeFile file(uploadStoreFile)
+            }
+            storePassword releaseSigningEnv("MINIMAL_SUDOKU_UPLOAD_STORE_PASSWORD")
+            keyAlias releaseSigningEnv("MINIMAL_SUDOKU_UPLOAD_KEY_ALIAS")
+            keyPassword releaseSigningEnv("MINIMAL_SUDOKU_UPLOAD_KEY_PASSWORD")
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
