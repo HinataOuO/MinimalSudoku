@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, memo } from "react";
 import { Pressable, Text, useWindowDimensions, View } from "react-native";
 
 import { CellPosition, CellValue, FilledCellValue } from "@/features/sudoku/types";
@@ -53,7 +53,7 @@ export function getHighlightedNumber(
   return isRapidInputMode ? rapidInputValue : null;
 }
 
-export function SudokuGrid() {
+function SudokuGridComponent() {
   const { width, height } = useWindowDimensions();
   const puzzle = useGameStore((state) => state.puzzle);
   const userGrid = useGameStore((state) => state.userGrid);
@@ -296,3 +296,5 @@ export function SudokuGrid() {
     </View>
   );
 }
+
+export const SudokuGrid = memo(SudokuGridComponent);

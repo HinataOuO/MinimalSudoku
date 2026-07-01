@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Eraser, Pencil, Undo2, Zap } from "lucide-react-native";
 
@@ -22,7 +23,7 @@ export function getCompletedNumberPadValues(
   return values.filter((number) => isNumberCompleted(userGrid, puzzle.solution, number));
 }
 
-export function NumberPad() {
+function NumberPadComponent() {
   const setCellValue = useGameStore((state) => state.setCellValue);
   const undoLastMove = useGameStore((state) => state.undoLastMove);
   const toggleNoteMode = useGameStore((state) => state.toggleNoteMode);
@@ -254,3 +255,5 @@ export function NumberPad() {
     </View>
   );
 }
+
+export const NumberPad = memo(NumberPadComponent);
