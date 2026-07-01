@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode
@@ -40,6 +41,14 @@ type AudioSettingsState = {
   muted: boolean;
   spotifyModeEnabled: boolean;
   volume: number;
+};
+
+type AudioSettingsApplyScope = "all" | "effects" | "music";
+
+type CommitAudioSettingsOptions = {
+  applyScope?: AudioSettingsApplyScope;
+  markHydrationChanged?: boolean;
+  persist?: boolean;
 };
 
 const defaultAudioSettings: AudioSettingsState = {
@@ -127,6 +136,58 @@ function normalizeAudioSettings(settings: Partial<AudioSettingsState>) {
   };
 }
 
+function updateSoundVolume(settings: AudioSettingsState, nextVolume: number) {
+  const clampedVolume = clampVolume(nextVolume);
+  const normalizedSounds = normalizeVolumeSettings(
+    clampedVolume,
+    clampedVolume === 0,
+    defaultAudioSettings.volume
+  );
+
+  return {
+    ...settings,
+    muted: normalizedSounds.muted,
+    volume: normalizedSounds.volume
+  };
+}
+
+function updateMusicVolume(settings: AudioSettingsState, nextVolume: number) {
+  const clampedVolume = clampVolume(nextVolume);
+  const normalizedMusic = normalizeVolumeSettings(
+    clampedVolume,
+    clampedVolume === 0,
+    defaultAudioSettings.musicVolume
+  );
+
+  return {
+    ...settings,
+    musicMuted: normalizedMusic.muted,
+    musicVolume: normalizedMusic.volume
+  };
+}
+
+function toggleSoundMuted(settings: AudioSettingsState) {
+  const nextMuted = !settings.muted;
+  const normalizedSounds = normalizeVolumeSettings(
+    !nextMuted && settings.volume === 0 ? defaultAudioSettings.volume : settings.volume,
+    nextMuted,
+    defaultAudioSettings.volume
+  );
+
+  return {
+    ...settings,
+    muted: normalizedSounds.muted,
+    volume: normalizedSounds.volume
+  };
+}
+
+function toggleSpotifyModeSetting(settings: AudioSettingsState) {
+  return {
+    ...settings,
+    spotifyModeEnabled: !settings.spotifyModeEnabled
+  };
+}
+
 function applyAudioSettingsToPlayer(player: AudioPlayer, settings: AudioSettingsState) {
   if (settings.spotifyModeEnabled || settings.muted || settings.volume === 0) {
     player.muted = true;
@@ -195,6 +256,20 @@ export function SoundProvider({ children }: { children: ReactNode }) {
   const introPlayer = useAudioPlayer(introSound);
   const musicPlayer = useAudioPlayer(musicSound);
   const victoryPlayer = useAudioPlayer(victorySound);
+  const players = useMemo(
+    () => ({
+      click: clickPlayer,
+      gameOver: gameOverPlayer,
+      intro: introPlayer,
+      music: musicPlayer,
+      victory: victoryPlayer
+    }),
+    [clickPlayer, gameOverPlayer, introPlayer, musicPlayer, victoryPlayer]
+  );
+  const effectPlayers = useMemo(
+    () => [players.click, players.gameOver, players.victory],
+    [players]
+  );
   const [audioModeConfigured, setAudioModeConfigured] = useState(false);
   const [musicVolume, setMusicVolumeState] = useState(defaultAudioSettings.musicVolume);
   const [musicMuted, setMusicMuted] = useState(defaultAudioSettings.musicMuted);
@@ -241,18 +316,16 @@ export function SoundProvider({ children }: { children: ReactNode }) {
 
   const applyAudioSettings = useCallback(
     (nextSettings: AudioSettingsState) => {
-      applyAudioSettingsToPlayer(clickPlayer, nextSettings);
-      applyAudioSettingsToPlayer(gameOverPlayer, nextSettings);
-      applyAudioSettingsToPlayer(victoryPlayer, nextSettings);
+      effectPlayers.forEach((player) => applyAudioSettingsToPlayer(player, nextSettings));
     },
-    [clickPlayer, gameOverPlayer, victoryPlayer]
+    [effectPlayers]
   );
 
   const applyMusicSettings = useCallback(
     (nextSettings: AudioSettingsState) => {
-      applyMusicSettingsToPlayer(musicPlayer, nextSettings, introFinishedRef.current);
+      applyMusicSettingsToPlayer(players.music, nextSettings, introFinishedRef.current);
     },
-    [musicPlayer]
+    [players]
   );
 
   const persistQueuedAudioSettings = useCallback((nextSettings: AudioSettingsState) => {
@@ -301,6 +374,51 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     [applyAudioActiveState, applyAudioSettings, applyMusicSettings]
   );
 
+  const syncSettingsState = useCallback((nextSettings: AudioSettingsState) => {
+    setMusicVolumeState(nextSettings.musicVolume);
+    setMusicMuted(nextSettings.musicMuted);
+    setVolumeState(nextSettings.volume);
+    setMuted(nextSettings.muted);
+    setSpotifyModeEnabled(nextSettings.spotifyModeEnabled);
+  }, []);
+
+  const commitSettings = useCallback(
+    (nextSettings: AudioSettingsState, options: CommitAudioSettingsOptions = {}) => {
+      const {
+        applyScope = "all",
+        markHydrationChanged = true,
+        persist = true
+      } = options;
+
+      settingsRef.current = nextSettings;
+
+      if (markHydrationChanged) {
+        settingsChangedDuringHydrationRef.current = true;
+      }
+
+      syncSettingsState(nextSettings);
+
+      if (applyScope === "all") {
+        applySettings(nextSettings);
+      } else if (applyScope === "effects") {
+        applyAudioSettings(nextSettings);
+      } else {
+        applyMusicSettings(nextSettings);
+      }
+
+      if (persist) {
+        queuePersistAudioSettings(nextSettings);
+      }
+    },
+    [
+      applyAudioSettings,
+      applyMusicSettings,
+      applySettings,
+      queuePersistAudioSettings,
+      syncSettingsState
+    ]
+  );
+
   useEffect(() => {
     let isMounted = true;
 
@@ -319,11 +437,7 @@ export function SoundProvider({ children }: { children: ReactNode }) {
           : defaultAudioSettings;
 
         settingsRef.current = loadedSettings;
-        setMusicVolumeState(loadedSettings.musicVolume);
-        setMusicMuted(loadedSettings.musicMuted);
-        setVolumeState(loadedSettings.volume);
-        setMuted(loadedSettings.muted);
-        setSpotifyModeEnabled(loadedSettings.spotifyModeEnabled);
+        syncSettingsState(loadedSettings);
       })
       .catch(() => undefined)
       .finally(() => {
@@ -335,7 +449,7 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [syncSettingsState]);
 
   useEffect(() => {
     if (!settingsHydrated || !audioModeConfigured) {
@@ -354,21 +468,21 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     volume
   ]);
 
-  const playUiClick = useCallback(() => {
+  const playEffect = useCallback((player: AudioPlayer) => {
     if (settingsRef.current.spotifyModeEnabled) {
       return;
     }
 
-    playFromStart(clickPlayer);
-  }, [clickPlayer]);
+    playFromStart(player);
+  }, []);
+
+  const playUiClick = useCallback(() => {
+    playEffect(players.click);
+  }, [playEffect, players]);
 
   const playGameOver = useCallback(() => {
-    if (settingsRef.current.spotifyModeEnabled) {
-      return;
-    }
-
-    playFromStart(gameOverPlayer);
-  }, [gameOverPlayer]);
+    playEffect(players.gameOver);
+  }, [playEffect, players]);
 
   const playIntro = useCallback(() => {
     const shouldRestoreSpotifyMode = settingsRef.current.spotifyModeEnabled;
@@ -378,8 +492,8 @@ export function SoundProvider({ children }: { children: ReactNode }) {
       introAudioRestoreTimerRef.current = null;
     }
 
-    introPlayer.muted = false;
-    introPlayer.volume = 1;
+    players.intro.muted = false;
+    players.intro.volume = 1;
 
     void setIsAudioActiveAsync(true)
       .catch((error) => {
@@ -388,7 +502,7 @@ export function SoundProvider({ children }: { children: ReactNode }) {
         }
       })
       .finally(() => {
-        playFromStart(introPlayer);
+        playFromStart(players.intro);
 
         if (shouldRestoreSpotifyMode) {
           introAudioRestoreTimerRef.current = setTimeout(() => {
@@ -401,15 +515,11 @@ export function SoundProvider({ children }: { children: ReactNode }) {
           }, introAudioRestoreDelayMs);
         }
       });
-  }, [introPlayer]);
+  }, [players]);
 
   const playVictory = useCallback(() => {
-    if (settingsRef.current.spotifyModeEnabled) {
-      return;
-    }
-
-    playFromStart(victoryPlayer);
-  }, [victoryPlayer]);
+    playEffect(players.victory);
+  }, [playEffect, players]);
 
   const setIntroFinished = useCallback(() => {
     if (introFinishedRef.current) {
@@ -423,81 +533,26 @@ export function SoundProvider({ children }: { children: ReactNode }) {
   }, [applySettings, audioModeConfigured, settingsHydrated]);
 
   const setVolume = useCallback((nextVolume: number) => {
-    settingsChangedDuringHydrationRef.current = true;
-    const clampedVolume = clampVolume(nextVolume);
-    const normalizedSounds = normalizeVolumeSettings(
-      clampedVolume,
-      clampedVolume === 0,
-      defaultAudioSettings.volume
-    );
-    const nextSettings = {
-      ...settingsRef.current,
-      muted: normalizedSounds.muted,
-      volume: normalizedSounds.volume
-    };
-
-    settingsRef.current = nextSettings;
-    applyAudioSettings(nextSettings);
-    setVolumeState(nextSettings.volume);
-    setMuted(nextSettings.muted);
-    queuePersistAudioSettings(nextSettings);
-  }, [applyAudioSettings, queuePersistAudioSettings]);
+    commitSettings(updateSoundVolume(settingsRef.current, nextVolume), {
+      applyScope: "effects"
+    });
+  }, [commitSettings]);
 
   const setMusicVolume = useCallback((nextVolume: number) => {
-    settingsChangedDuringHydrationRef.current = true;
-    const clampedVolume = clampVolume(nextVolume);
-    const normalizedMusic = normalizeVolumeSettings(
-      clampedVolume,
-      clampedVolume === 0,
-      defaultAudioSettings.musicVolume
-    );
-    const nextSettings = {
-      ...settingsRef.current,
-      musicMuted: normalizedMusic.muted,
-      musicVolume: normalizedMusic.volume
-    };
-
-    settingsRef.current = nextSettings;
-    applyMusicSettings(nextSettings);
-    setMusicVolumeState(nextSettings.musicVolume);
-    setMusicMuted(nextSettings.musicMuted);
-    queuePersistAudioSettings(nextSettings);
-  }, [applyMusicSettings, queuePersistAudioSettings]);
+    commitSettings(updateMusicVolume(settingsRef.current, nextVolume), {
+      applyScope: "music"
+    });
+  }, [commitSettings]);
 
   const toggleMuted = useCallback(() => {
-    settingsChangedDuringHydrationRef.current = true;
-    const nextMuted = !settingsRef.current.muted;
-    const normalizedSounds = normalizeVolumeSettings(
-      !nextMuted && settingsRef.current.volume === 0
-        ? defaultAudioSettings.volume
-        : settingsRef.current.volume,
-      nextMuted,
-      defaultAudioSettings.volume
-    );
-    const nextSettings = {
-      ...settingsRef.current,
-      muted: normalizedSounds.muted,
-      volume: normalizedSounds.volume
-    };
-
-    settingsRef.current = nextSettings;
-    applyAudioSettings(nextSettings);
-    setMuted(nextSettings.muted);
-    queuePersistAudioSettings(nextSettings);
-  }, [applyAudioSettings, queuePersistAudioSettings]);
+    commitSettings(toggleSoundMuted(settingsRef.current), {
+      applyScope: "effects"
+    });
+  }, [commitSettings]);
 
   const toggleSpotifyMode = useCallback(() => {
-    settingsChangedDuringHydrationRef.current = true;
-    const nextSettings = {
-      ...settingsRef.current,
-      spotifyModeEnabled: !settingsRef.current.spotifyModeEnabled
-    };
-
-    settingsRef.current = nextSettings;
-    applySettings(nextSettings);
-    setSpotifyModeEnabled(nextSettings.spotifyModeEnabled);
-    queuePersistAudioSettings(nextSettings);
-  }, [applySettings, queuePersistAudioSettings]);
+    commitSettings(toggleSpotifyModeSetting(settingsRef.current));
+  }, [commitSettings]);
 
   return (
     <SoundContext.Provider

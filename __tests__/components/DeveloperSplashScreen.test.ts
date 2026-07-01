@@ -27,12 +27,24 @@ describe("DeveloperSplashScreen", () => {
     jest.useRealTimers();
   });
 
-  it("shows developer logo and plays intro when sweep starts", () => {
+  it("shows developer logo and delays intro until sweep starts", () => {
     const onFinish = jest.fn();
     const screen = render(React.createElement(DeveloperSplashScreen, { onFinish }));
 
     expect(screen.getByTestId("developer-splash")).toBeTruthy();
     expect(screen.getByLabelText("Developer logo OuO")).toBeTruthy();
+    expect(mockPlayIntro).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(1499);
+    });
+
+    expect(mockPlayIntro).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+
     expect(mockPlayIntro).toHaveBeenCalledTimes(1);
     expect(onFinish).not.toHaveBeenCalled();
   });
