@@ -9,7 +9,7 @@ jest.mock(
   "@react-native-async-storage/async-storage",
   () => require("@react-native-async-storage/async-storage/jest/async-storage-mock"),
 );
-jest.mock("../../assets/audio/intro.wav", () => 3, { virtual: true });
+jest.mock("../../assets/audio/intro.mp3", () => 3, { virtual: true });
 jest.mock("../../assets/audio/loop.mp3", () => 4, { virtual: true });
 
 const mockSetAudioModeAsync = jest.fn().mockResolvedValue(undefined);

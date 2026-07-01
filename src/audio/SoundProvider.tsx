@@ -245,7 +245,7 @@ function getPlaybackAudioMode(): Partial<AudioMode> {
 
 const clickSound = require("../../assets/audio/click.mp3") as AudioSource;
 const gameOverSound = require("../../assets/audio/lose.mp3") as AudioSource;
-const introSound = require("../../assets/audio/intro.wav") as AudioSource;
+const introSound = require("../../assets/audio/intro.mp3") as AudioSource;
 const musicSound = require("../../assets/audio/loop.mp3") as AudioSource;
 const victorySound = require("../../assets/audio/win.mp3") as AudioSource;
 const introAudioRestoreDelayMs = 1300;
