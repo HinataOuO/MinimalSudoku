@@ -121,8 +121,22 @@ function partializeState() {
 
 function persistenceOptions() {
   return (useGameStore as unknown as {
-    persist: { getOptions: () => { version?: number } };
+    persist: {
+      getOptions: () => {
+        version?: number;
+        merge?: (persistedState: unknown, currentState: unknown) => Record<string, unknown>;
+      };
+    };
   }).persist.getOptions();
+}
+
+function mergePersistedState(persistedState: Record<string, unknown>) {
+  const merge = persistenceOptions().merge;
+  if (!merge) {
+    throw new Error("Expected persisted store merge option");
+  }
+
+  return merge(persistedState, useGameStore.getInitialState());
 }
 
 function wrongValueFor(
@@ -193,6 +207,22 @@ describe("game store undo", () => {
     expect(valueAt(useGameStore.getState().userGrid!, firstCell)).toBe(firstValue);
     expect(valueAt(useGameStore.getState().userGrid!, secondCell)).toBe(0);
     expect(useGameStore.getState().moveHistory).toHaveLength(1);
+  });
+
+  it("undoes clearing a wrong value", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+    const value = wrongValueFor(puzzle!.solution, cell);
+
+    useGameStore.getState().selectCell(cell);
+    useGameStore.getState().setCellValue(value);
+    useGameStore.getState().clearSelectedCell();
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(0);
+
+    useGameStore.getState().undoLastMove();
+
+    expect(valueAt(useGameStore.getState().userGrid!, cell)).toBe(value);
+    expect(useGameStore.getState().mistakes[`${cell.row}-${cell.col}`]).toBe(true);
   });
 
   it("clears undo history when restarting", () => {
@@ -359,6 +389,22 @@ describe("game store notes", () => {
     expect(valueAt(useGameStore.getState().userGrid!, mistakeCell)).not.toBe(0);
     expect(useGameStore.getState().mistakes[`${mistakeCell.row}-${mistakeCell.col}`]).toBe(true);
     expect(useGameStore.getState().mistakeCount).toBe(1);
+  });
+
+  it("undoes clearing notes", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+
+    useGameStore.getState().selectCell(cell);
+    useGameStore.getState().toggleNoteMode();
+    useGameStore.getState().setCellValue(2);
+    useGameStore.getState().setCellValue(8);
+    useGameStore.getState().clearSelectedCellNotes();
+    expect(notesAt(cell)).toEqual([]);
+
+    useGameStore.getState().undoLastMove();
+
+    expect(notesAt(cell)).toEqual([2, 8]);
   });
 
   it("does not add or clear notes on fixed cells", () => {
@@ -534,7 +580,12 @@ describe("game store arcade mode", () => {
       themeMode: "light"
     };
 
-    expect(migrateGameStoreState(persistedState, 1)).toBe(persistedState);
+    expect(migrateGameStoreState(persistedState, 1)).toEqual(
+      expect.objectContaining({
+        arcadeModeEnabled: false,
+        themeMode: "light"
+      })
+    );
   });
 });
 
@@ -564,6 +615,98 @@ describe("game store theme mode", () => {
     const persistedState = partializeState();
 
     expect(persistedState.themeMode).toBe("light");
+  });
+});
+
+describe("game store persistence", () => {
+  beforeEach(() => {
+    useGameStore.getState().startNewGame("easy");
+  });
+
+  it("does not persist volatile UI and generation state", () => {
+    useGameStore.setState({
+      isGenerating: true,
+      generationError: "boom"
+    });
+    useGameStore.getState().highlightNumber(5);
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+    useGameStore.getState().setRapidInputValue(7);
+    useGameStore.getState().toggleNoteMode();
+
+    const persistedState = partializeState();
+
+    expect(persistedState.isGenerating).toBeUndefined();
+    expect(persistedState.generationError).toBeUndefined();
+    expect(persistedState.isNoteMode).toBeUndefined();
+    expect(persistedState.isRapidInputMode).toBeUndefined();
+    expect(persistedState.rapidInputValue).toBeUndefined();
+    expect(persistedState.highlightedNumber).toBeUndefined();
+  });
+
+  it("rehydrates progress, timer, notes, and preferences without stale volatile state", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+
+    useGameStore.getState().setThemeMode("light");
+    useGameStore.getState().setArcadeModeEnabled(false);
+    useGameStore.getState().selectCell(cell);
+    useGameStore.getState().toggleNoteMode();
+    useGameStore.getState().setCellValue(6);
+    useGameStore.setState({
+      elapsedMs: 12_000,
+      isNoteMode: true,
+      isRapidInputMode: true,
+      rapidInputValue: 6,
+      highlightedNumber: 6,
+      isGenerating: true,
+      generationError: "stale"
+    });
+
+    const mergedState = mergePersistedState(partializeState());
+
+    expect(mergedState.puzzle).toEqual(puzzle);
+    expect((mergedState.noteGrid as FilledCellValue[][][])[cell.row][cell.col]).toEqual([6]);
+    expect(mergedState.selectedCell).toEqual(cell);
+    expect(mergedState.elapsedMs).toBe(12_000);
+    expect(mergedState.arcadeModeEnabled).toBe(false);
+    expect(mergedState.themeMode).toBe("light");
+    expect(mergedState.isNoteMode).toBe(false);
+    expect(mergedState.isRapidInputMode).toBe(false);
+    expect(mergedState.rapidInputValue).toBeNull();
+    expect(mergedState.highlightedNumber).toBeNull();
+    expect(mergedState.isGenerating).toBe(false);
+    expect(mergedState.generationError).toBeNull();
+  });
+
+  it("migrates legacy progress while filling missing newer fields", () => {
+    const { puzzle } = useGameStore.getState();
+    const cell = findEditableCell(puzzle!.givens);
+
+    useGameStore.getState().setThemeMode("light");
+    useGameStore.getState().selectCell(cell);
+    useGameStore.getState().toggleNoteMode();
+    useGameStore.getState().setCellValue(4);
+    useGameStore.setState({ elapsedMs: 9_000 });
+
+    const legacyState = {
+      ...partializeState(),
+      hardModeEnabled: false,
+      noteGrid: undefined,
+      moveHistory: undefined
+    };
+    const migratedState = migrateGameStoreState(legacyState, 0) as Record<string, unknown>;
+
+    expect(migratedState.hardModeEnabled).toBeUndefined();
+    expect(migratedState.arcadeModeEnabled).toBe(true);
+    expect(migratedState.puzzle).toEqual(puzzle);
+    expect(migratedState.userGrid).toEqual(useGameStore.getState().userGrid);
+    expect(migratedState.selectedCell).toEqual(cell);
+    expect(migratedState.themeMode).toBe("light");
+    expect(migratedState.elapsedMs).toBe(9_000);
+    expect(migratedState.noteGrid).toHaveLength(9);
+    expect((migratedState.noteGrid as FilledCellValue[][][]).flat(2)).toEqual([]);
+    expect(migratedState.moveHistory).toEqual([]);
   });
 });
 
@@ -614,6 +757,7 @@ describe("game store shared games", () => {
     useGameStore.getState().toggleNoteMode();
     useGameStore.getState().setCellValue(4);
     useGameStore.getState().highlightNumber(4);
+    useGameStore.getState().setThemeMode("light");
 
     jest.spyOn(Date, "now").mockReturnValue(42_000);
     const imported = useGameStore.getState().startSharedGame(sharedPayload);
@@ -625,6 +769,7 @@ describe("game store shared games", () => {
     expect(state.userGrid).toEqual(sharedPuzzle.givens);
     expect(state.difficulty).toBe("expert");
     expect(state.arcadeModeEnabled).toBe(false);
+    expect(state.themeMode).toBe("light");
     expect(state.status).toBe("playing");
     expect(state.noteGrid.flat(2)).toEqual([]);
     expect(state.isNoteMode).toBe(false);
@@ -811,6 +956,22 @@ describe("game store number highlight", () => {
     useGameStore.getState().restartGame();
 
     expect(useGameStore.getState().highlightedNumber).toBeNull();
+  });
+
+  it("restarts transient input state without changing preferences", () => {
+    useGameStore.getState().setThemeMode("light");
+    useGameStore.getState().setArcadeModeEnabled(true);
+    useGameStore.getState().toggleRapidInputMode();
+    useGameStore.getState().setRapidInputValue(5);
+    useGameStore.getState().highlightNumber(5);
+    useGameStore.getState().restartGame();
+
+    expect(useGameStore.getState().isNoteMode).toBe(false);
+    expect(useGameStore.getState().isRapidInputMode).toBe(false);
+    expect(useGameStore.getState().rapidInputValue).toBeNull();
+    expect(useGameStore.getState().highlightedNumber).toBeNull();
+    expect(useGameStore.getState().themeMode).toBe("light");
+    expect(useGameStore.getState().arcadeModeEnabled).toBe(true);
   });
 
   it("clears highlighted number while generating async games", async () => {
